@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fantasy League Tracker</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div>
+    <h1>Fantasy League Tracker</h1>
+    <p class="subtitle" id="header-subtitle">Who's actually good, and who's just been lucky.</p>
+  </div>
+  <div class="season-toggle" id="season-toggle"></div>
+</header>
+
+<nav class="tabs" id="tabs">
+  <button data-tab="standings" class="active">Standings</button>
+  <button data-tab="team">Team Detail</button>
+  <button data-tab="weekly">Weekly Recap</button>
+  <button data-tab="about">How This Works</button>
+</nav>
+
+<main>
+
+  <section id="panel-standings" class="panel active">
+    <h2>Season Standings</h2>
+    <p class="panel-intro">Actual record next to the record you'd have if every week you just needed to beat the league median. The gap between them is luck.</p>
+
+    <div class="card chart-card">
+      <div id="luck-chart"></div>
+    </div>
+
+    <div class="table-wrap card" style="padding:0;">
+      <table id="standings-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Team</th>
+            <th>Record</th>
+            <th>Median Record</th>
+            <th>Luck</th>
+            <th>All-Play</th>
+            <th>PF</th>
+            <th>PA</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="panel-team" class="panel">
+    <h2>Team Detail</h2>
+    <p class="panel-intro">Every game this team has played, and whether the result matched how they actually scored.</p>
+
+    <div class="team-picker">
+      <label for="team-select">Team</label>
+      <select id="team-select"></select>
+    </div>
+
+    <div class="stat-row" id="team-stats"></div>
+
+    <div class="card chart-card">
+      <div id="team-chart"></div>
+      <div class="chart-legend">
+        <span class="item"><span class="swatch" style="background:var(--series-1)"></span>Points For</span>
+        <span class="item"><span class="swatch" style="background:var(--text-muted); opacity:.6;"></span>Week Median</span>
+      </div>
+    </div>
+
+    <div class="table-wrap card" style="padding:0;">
+      <table id="team-table">
+        <thead>
+          <tr>
+            <th>Wk</th>
+            <th>Opponent</th>
+            <th>PF</th>
+            <th>PA</th>
+            <th>Median</th>
+            <th>Result</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="panel-weekly" class="panel">
+    <h2>Weekly Recap</h2>
+    <p class="panel-intro">Every matchup for the selected week, with the league median that week for context.</p>
+    <div class="week-picker" id="week-picker"></div>
+    <div class="matchup-grid" id="matchup-grid"></div>
+  </section>
+
+  <section id="panel-about" class="panel about">
+    <h2>How this works</h2>
+    <ul>
+      <li><strong>Luck Quadrant.</strong> Every game is scored two ways: did you win your actual matchup, and did your score beat the league median that week? <strong>Deserved Win</strong> — you won and were above median. <strong>Lucky Win</strong> — you won, but your score was below median; you beat a team having a worse week than you. <strong>Unlucky Loss</strong> — you lost despite being above median; you ran into someone's best week. <strong>Deserved Loss</strong> — you lost and were below median too.</li>
+      <li><strong>Median Record.</strong> Your record if, instead of playing your actual opponent, you just needed to beat the league median every week — a rough stand-in for "how a replacement-level schedule would have treated you."</li>
+      <li><strong>Luck Rating.</strong> Actual Wins − Median Wins. Positive means your record is better than your scoring deserves; negative means it's worse.</li>
+      <li><strong>All-Play record.</strong> How many of the other 9 teams you'd have beaten that week if everyone played everyone — the least schedule-dependent measure of how good a team actually is.</li>
+    </ul>
+  </section>
+
+</main>
+
+<footer>Generated from the league's weekly scoreboards.</footer>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
