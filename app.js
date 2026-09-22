@@ -139,7 +139,7 @@
     var halfW = chartW / 2 - valueGutter; // reserve room for the value label at the far end
     var scale = halfW / maxAbs;
 
-    var s = svg("svg", { viewBox: "0 0 " + W + " " + H, role: "img", "aria-label": "Luck rating by team" });
+    var s = svg("svg", { viewBox: "0 0 " + W + " " + H, role: "img", "aria-label": "Net Mickey by team" });
     s.appendChild(svg("line", { class: "baseline", x1: mid, x2: mid, y1: padTop, y2: H - padBottom }));
 
     sorted.forEach(function (r, i) {
@@ -200,7 +200,7 @@
     var tiles = [
       { label: "Record", value: record(standing.wins, standing.losses, standing.ties) },
       { label: "Median Record", value: record(standing.medianWins, standing.games - standing.medianWins, 0) },
-      { label: "Luck Rating", value: signed(standing.luckRating), cls: standing.luckRating > 0 ? "pos" : (standing.luckRating < 0 ? "neg" : "") },
+      { label: "Net Mickey", value: signed(standing.luckRating), cls: standing.luckRating > 0 ? "pos" : (standing.luckRating < 0 ? "neg" : "") },
       { label: "All-Play Win %", value: pct(standing.allPlayWinPct) },
     ];
     tiles.forEach(function (t) {
