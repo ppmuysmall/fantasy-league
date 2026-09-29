@@ -33,18 +33,22 @@
       <div id="luck-chart"></div>
     </div>
 
+    <div class="table-toolbar">
+      <input type="search" id="standings-search" class="table-search" placeholder="Filter by team or manager…" aria-label="Filter standings">
+    </div>
+
     <div class="table-wrap card" style="padding:0;">
       <table id="standings-table">
         <thead>
           <tr>
-            <th>#</th>
-            <th>Team</th>
-            <th>Record</th>
-            <th>Median Record</th>
-            <th>Net Mickey</th>
-            <th>All-Play</th>
-            <th>PF</th>
-            <th>PA</th>
+            <th class="sortable" data-key="actualRank">#<span class="arrow"></span></th>
+            <th class="sortable" data-key="team">Team<span class="arrow"></span></th>
+            <th class="sortable" data-key="actualWinPct">Record<span class="arrow"></span></th>
+            <th class="sortable" data-key="medianWinPct">Median Record<span class="arrow"></span></th>
+            <th class="sortable" data-key="luckRating">Net Mickey<span class="arrow"></span></th>
+            <th class="sortable" data-key="allPlayWinPct">All-Play<span class="arrow"></span></th>
+            <th class="sortable" data-key="pointsFor">PF<span class="arrow"></span></th>
+            <th class="sortable" data-key="pointsAgainst">PA<span class="arrow"></span></th>
           </tr>
         </thead>
         <tbody></tbody>

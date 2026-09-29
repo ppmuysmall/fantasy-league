@@ -7,6 +7,14 @@
     season: DATA.currentSeason || seasonKeys[0],
     manager: null,
     week: null,
+    standingsSort: { key: "actualRank", dir: "asc" },
+    standingsFilter: "",
+  };
+
+  // columns where a bigger number is "better" and should sort high-to-low by default
+  var DESC_BY_DEFAULT = {
+    actualWinPct: true, medianWinPct: true, luckRating: true,
+    allPlayWinPct: true, pointsFor: true, pointsAgainst: true,
   };
 
   var tooltipEl = document.getElementById("tooltip");
@@ -77,6 +85,9 @@
         state.season = key;
         state.manager = null;
         state.week = null;
+        state.standingsFilter = "";
+        var searchInput = document.getElementById("standings-search");
+        if (searchInput) searchInput.value = "";
         buildSeasonToggle();
         renderAll();
       });
@@ -97,31 +108,87 @@
   }
 
   // ---------------- Standings ----------------
+  function buildStandingsControls() {
+    var searchInput = document.getElementById("standings-search");
+    if (searchInput) {
+      searchInput.addEventListener("input", function () {
+        state.standingsFilter = searchInput.value.trim().toLowerCase();
+        renderStandings();
+      });
+    }
+
+    var headers = document.querySelectorAll("#standings-table thead th[data-key]");
+    headers.forEach(function (th) {
+      th.addEventListener("click", function () {
+        var key = th.dataset.key;
+        if (state.standingsSort.key === key) {
+          state.standingsSort.dir = state.standingsSort.dir === "asc" ? "desc" : "asc";
+        } else {
+          state.standingsSort.key = key;
+          state.standingsSort.dir = DESC_BY_DEFAULT[key] ? "desc" : "asc";
+        }
+        renderStandings();
+      });
+    });
+  }
+
+  function updateSortIndicators() {
+    var headers = document.querySelectorAll("#standings-table thead th[data-key]");
+    headers.forEach(function (th) {
+      var arrow = th.querySelector(".arrow");
+      if (th.dataset.key === state.standingsSort.key) {
+        th.classList.add("sorted");
+        if (arrow) arrow.textContent = state.standingsSort.dir === "asc" ? "▲" : "▼";
+      } else {
+        th.classList.remove("sorted");
+        if (arrow) arrow.textContent = "";
+      }
+    });
+  }
+
   function renderStandings() {
     var d = currentData();
-    var rows = d.standings.slice().sort(function (a, b) { return a.actualRank - b.actualRank; });
+    var filter = state.standingsFilter;
+    var rows = d.standings.filter(function (r) {
+      if (!filter) return true;
+      return r.team.toLowerCase().indexOf(filter) !== -1 || r.manager.toLowerCase().indexOf(filter) !== -1;
+    });
+
+    var key = state.standingsSort.key, dir = state.standingsSort.dir;
+    rows.sort(function (a, b) {
+      var av = a[key], bv = b[key];
+      var cmp = (typeof av === "string") ? av.localeCompare(bv) : (av - bv);
+      return dir === "asc" ? cmp : -cmp;
+    });
+    updateSortIndicators();
 
     document.getElementById("header-subtitle").textContent =
       d.season + " — " + d.weeksLogged + " week" + (d.weeksLogged === 1 ? "" : "s") + " logged";
 
     var tbody = document.querySelector("#standings-table tbody");
     tbody.innerHTML = "";
-    rows.forEach(function (r) {
-      var tr = el("tr");
-      tr.appendChild(el("td", { class: "rank" }, [String(r.actualRank)]));
-      var teamCell = el("td", { class: "team-cell" });
-      teamCell.appendChild(el("span", { class: "team-name" }, [r.team]));
-      teamCell.appendChild(el("span", { class: "manager-name" }, [r.manager]));
-      tr.appendChild(teamCell);
-      tr.appendChild(el("td", {}, [record(r.wins, r.losses, r.ties)]));
-      tr.appendChild(el("td", {}, [record(r.medianWins, r.games - r.medianWins, 0)]));
-      var luckCls = r.luckRating > 0 ? "pos" : (r.luckRating < 0 ? "neg" : "zero");
-      tr.appendChild(el("td", {}, [el("span", { class: "num " + luckCls }, [signed(r.luckRating)])]));
-      tr.appendChild(el("td", {}, [r.allPlayWins + " wins (" + pct(r.allPlayWinPct) + ")"]));
-      tr.appendChild(el("td", {}, [fmt2(r.pointsFor)]));
-      tr.appendChild(el("td", {}, [fmt2(r.pointsAgainst)]));
-      tbody.appendChild(tr);
-    });
+    if (!rows.length) {
+      var emptyRow = el("tr", { class: "empty-row" });
+      emptyRow.appendChild(el("td", { colspan: "8" }, ["No teams match “" + state.standingsFilter + "”."]));
+      tbody.appendChild(emptyRow);
+    } else {
+      rows.forEach(function (r) {
+        var tr = el("tr");
+        tr.appendChild(el("td", { class: "rank" }, [String(r.actualRank)]));
+        var teamCell = el("td", { class: "team-cell" });
+        teamCell.appendChild(el("span", { class: "team-name" }, [r.team]));
+        teamCell.appendChild(el("span", { class: "manager-name" }, [r.manager]));
+        tr.appendChild(teamCell);
+        tr.appendChild(el("td", {}, [record(r.wins, r.losses, r.ties)]));
+        tr.appendChild(el("td", {}, [record(r.medianWins, r.games - r.medianWins, 0)]));
+        var luckCls = r.luckRating > 0 ? "pos" : (r.luckRating < 0 ? "neg" : "zero");
+        tr.appendChild(el("td", {}, [el("span", { class: "num " + luckCls }, [signed(r.luckRating)])]));
+        tr.appendChild(el("td", {}, [r.allPlayWins + " wins (" + pct(r.allPlayWinPct) + ")"]));
+        tr.appendChild(el("td", {}, [fmt2(r.pointsFor)]));
+        tr.appendChild(el("td", {}, [fmt2(r.pointsAgainst)]));
+        tbody.appendChild(tr);
+      });
+    }
 
     renderLuckChart(rows);
   }
@@ -356,5 +423,6 @@
   }
 
   buildTabs();
+  buildStandingsControls();
   renderAll();
 })();
