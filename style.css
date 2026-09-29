@@ -202,24 +202,11 @@ h2 { font-size: 1.15rem; margin: 0 0 4px; }
 .stat-tile .value.pos { color: var(--diverge-pos); }
 .stat-tile .value.neg { color: var(--diverge-neg); }
 
-/* ---- Table toolbar (search / filter) ---- */
-.table-toolbar {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 10px;
+.table-hint {
+  margin: -10px 0 10px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
 }
-.table-search {
-  font: inherit;
-  font-size: 0.85rem;
-  padding: 7px 12px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text-primary);
-  width: 240px;
-  max-width: 100%;
-}
-.table-search::placeholder { color: var(--text-muted); }
 
 /* ---- Tables ---- */
 .table-wrap { overflow-x: auto; }
@@ -249,9 +236,10 @@ th {
 th.sortable { cursor: pointer; user-select: none; }
 th.sortable:hover { color: var(--text-secondary); }
 th.sortable.sorted { color: var(--text-primary); }
-th .arrow { display: inline-block; margin-left: 3px; font-size: 0.85em; color: var(--series-1); }
+th .arrow { display: inline-block; margin-left: 3px; font-size: 0.85em; color: var(--text-muted); opacity: 0.4; }
+th .arrow:empty::after { content: "\21C5"; } /* faint up/down glyph hints that the column sorts, before it's clicked */
+th.sortable.sorted .arrow { color: var(--series-1); opacity: 1; }
 tbody tr:hover { background: var(--surface-2); }
-tbody .empty-row td { text-align: center; color: var(--text-muted); padding: 24px 10px; }
 td.rank { font-variant-numeric: tabular-nums; color: var(--text-muted); }
 td.team-cell { display: flex; flex-direction: column; gap: 1px; }
 td.team-cell .team-name { font-weight: 600; }
