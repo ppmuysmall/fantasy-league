@@ -4,7 +4,402 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Fantasy League Tracker</title>
-<link rel="stylesheet" href="style.css">
+<style>
+/* ===== Design tokens (dataviz reference palette) ===== */
+:root {
+  color-scheme: light;
+  --page:        #f9f9f7;
+  --surface:     #fcfcfb;
+  --surface-2:   #f2f1ed;
+  --text-primary:   #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted:     #898781;
+  --gridline:    #e1e0d9;
+  --baseline:    #c3c2b7;
+  --border:      rgba(11,11,11,0.10);
+
+  --series-1:    #2a78d6; /* blue */
+  --series-1-soft: #cde2fb;
+  --diverge-pos: #2a78d6; /* lucky = blue */
+  --diverge-neg: #e34948; /* unlucky = red */
+  --diverge-mid: #f0efec;
+
+  --good:     #0ca30c;
+  --warning:  #c98500; /* darker than fab219 for text-legible use on light */
+  --warning-bg: #fab219;
+  --serious:  #ec835a;
+  --critical: #d03b3b;
+
+  --radius: 10px;
+  --font: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page:        #0d0d0d;
+    --surface:     #1a1a19;
+    --surface-2:   #232322;
+    --text-primary:   #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted:     #898781;
+    --gridline:    #2c2c2a;
+    --baseline:    #383835;
+    --border:      rgba(255,255,255,0.10);
+
+    --series-1:    #3987e5;
+    --series-1-soft: #184f95;
+    --diverge-pos: #3987e5;
+    --diverge-neg: #e66767;
+    --diverge-mid: #383835;
+
+    --good:     #0ca30c;
+    --warning:  #eda100;
+    --warning-bg: #c98500;
+    --serious:  #ec835a;
+    --critical: #e66767;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page:        #0d0d0d;
+  --surface:     #1a1a19;
+  --surface-2:   #232322;
+  --text-primary:   #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted:     #898781;
+  --gridline:    #2c2c2a;
+  --baseline:    #383835;
+  --border:      rgba(255,255,255,0.10);
+
+  --series-1:    #3987e5;
+  --series-1-soft: #184f95;
+  --diverge-pos: #3987e5;
+  --diverge-neg: #e66767;
+  --diverge-mid: #383835;
+
+  --good:     #0ca30c;
+  --warning:  #eda100;
+  --warning-bg: #c98500;
+  --serious:  #ec835a;
+  --critical: #e66767;
+}
+
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--page);
+  color: var(--text-primary);
+  font-family: var(--font);
+}
+body {
+  padding: 0 16px 48px;
+  max-width: 1080px;
+  margin: 0 auto;
+}
+a { color: var(--series-1); }
+
+/* ---- Header ---- */
+.site-header {
+  padding: 28px 0 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-end;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+}
+.site-header h1 {
+  margin: 0 0 4px;
+  font-size: 1.5rem;
+}
+.site-header .subtitle {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+.season-toggle {
+  display: flex;
+  gap: 4px;
+  background: var(--surface-2);
+  border-radius: 999px;
+  padding: 3px;
+}
+.season-toggle button {
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 7px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.season-toggle button.active {
+  background: var(--surface);
+  color: var(--text-primary);
+  box-shadow: 0 1px 3px var(--border);
+}
+
+/* ---- Tabs ---- */
+.tabs {
+  display: flex;
+  gap: 4px;
+  margin: 20px 0 24px;
+  border-bottom: 1px solid var(--gridline);
+  overflow-x: auto;
+}
+.tabs button {
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 10px 14px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+}
+.tabs button.active {
+  color: var(--text-primary);
+  border-bottom-color: var(--series-1);
+}
+
+.panel { display: none; }
+.panel.active { display: block; }
+
+h2 { font-size: 1.15rem; margin: 0 0 4px; }
+.panel-intro { color: var(--text-secondary); font-size: 0.9rem; margin: 0 0 20px; }
+
+/* ---- Cards / stat tiles ---- */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+  margin-bottom: 20px;
+}
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.stat-tile {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+.stat-tile .label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+.stat-tile .value {
+  font-size: 1.4rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.stat-tile .value.pos { color: var(--diverge-pos); }
+.stat-tile .value.neg { color: var(--diverge-neg); }
+
+.table-hint {
+  margin: -10px 0 10px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+/* ---- Tables ---- */
+.table-wrap { overflow-x: auto; }
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.88rem;
+}
+th, td {
+  padding: 9px 10px;
+  text-align: right;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--gridline);
+}
+th:first-child, td:first-child,
+th:nth-child(2), td:nth-child(2) { text-align: left; }
+th {
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+}
+th.sortable { cursor: pointer; user-select: none; }
+th.sortable:hover { color: var(--text-secondary); }
+th.sortable.sorted { color: var(--text-primary); }
+th .arrow { display: inline-block; margin-left: 3px; font-size: 0.85em; color: var(--text-muted); opacity: 0.4; }
+th .arrow:empty::after { content: "\21C5"; } /* faint up/down glyph hints that the column sorts, before it's clicked */
+th.sortable.sorted .arrow { color: var(--series-1); opacity: 1; }
+tbody tr:hover { background: var(--surface-2); }
+td.rank { font-variant-numeric: tabular-nums; color: var(--text-muted); }
+td.team-cell { display: flex; flex-direction: column; gap: 1px; }
+td.team-cell .team-name { font-weight: 600; }
+td.team-cell .manager-name { font-size: 0.75rem; color: var(--text-muted); font-weight: 400; }
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.chip.good     { background: color-mix(in srgb, var(--good) 16%, transparent);     color: var(--good); }
+.chip.warning  { background: color-mix(in srgb, var(--warning-bg) 22%, transparent); color: var(--warning); }
+.chip.serious  { background: color-mix(in srgb, var(--serious) 20%, transparent);  color: var(--serious); }
+.chip.critical { background: color-mix(in srgb, var(--critical) 16%, transparent); color: var(--critical); }
+.chip.neutral  { background: var(--surface-2); color: var(--text-secondary); }
+.chip .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none; }
+
+.num.pos { color: var(--diverge-pos); font-weight: 600; }
+.num.neg { color: var(--diverge-neg); font-weight: 600; }
+.num.zero { color: var(--text-secondary); }
+
+/* ---- Team picker ---- */
+.team-picker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+.team-picker label { font-size: 0.85rem; color: var(--text-secondary); }
+.team-picker select {
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-primary);
+}
+
+/* ---- Charts ---- */
+.chart-card svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart-legend {
+  display: flex;
+  gap: 18px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+.chart-legend .item { display: flex; align-items: center; gap: 6px; }
+.chart-legend .swatch { width: 14px; height: 3px; border-radius: 2px; }
+
+.axis-label, .tick-label { fill: var(--text-muted); font-size: 10px; }
+.gridline { stroke: var(--gridline); stroke-width: 1; }
+.baseline { stroke: var(--baseline); stroke-width: 1; }
+
+.bar-label { font-size: 11px; fill: var(--text-secondary); font-weight: 600; }
+.hover-dot { fill: var(--surface); stroke-width: 2; }
+
+.tooltip {
+  position: absolute;
+  pointer-events: none;
+  background: var(--text-primary);
+  color: var(--page);
+  font-size: 0.78rem;
+  padding: 6px 9px;
+  border-radius: 6px;
+  transform: translate(-50%, -120%);
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.1s;
+  z-index: 5;
+}
+.tooltip.show { opacity: 0.96; }
+
+/* ---- Weekly recap ---- */
+.week-picker { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 18px; }
+.week-picker button {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.week-picker button.active {
+  background: var(--series-1);
+  border-color: var(--series-1);
+  color: #fff;
+}
+.matchup-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+.matchup {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+.matchup .side {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+}
+.matchup .side .name { font-weight: 600; font-size: 0.92rem; }
+.matchup .side .name.winner { color: var(--text-primary); }
+.matchup .side .name.loser { color: var(--text-muted); font-weight: 500; }
+.matchup .side .score { font-variant-numeric: tabular-nums; font-weight: 700; }
+.matchup .chip { margin: 0 0 8px; }
+.matchup .median-line {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--gridline);
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* ---- About ---- */
+.about ul { padding-left: 20px; }
+.about li { margin-bottom: 10px; line-height: 1.5; color: var(--text-secondary); font-size: 0.92rem; }
+.about strong { color: var(--text-primary); }
+
+footer {
+  margin-top: 40px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 560px) {
+  .site-header { flex-direction: column; align-items: flex-start; }
+  th, td { padding: 8px 6px; font-size: 0.8rem; }
+}
+
+</style>
 </head>
 <body>
 
@@ -113,7 +508,418 @@
 
 <div class="tooltip" id="tooltip"></div>
 
-<script src="data.js"></script>
-<script src="app.js"></script>
+<script>
+window.LEAGUE_DATA = {"seasons":{"2026.27":{"season":"2026.27","weeksLogged":5,"standings":[{"manager":"Will Ferris","team":"THE BROCK","games":5,"wins":2,"losses":3,"ties":0,"medianWins":4,"luckRating":-2,"luckyWins":0,"unluckyLosses":2,"deservedWins":2,"deservedLosses":1,"pointsFor":659.36,"pointsAgainst":648.16,"avgPF":131.87,"allPlayWins":28,"allPlayWinPct":0.622222222222222,"actualWinPct":0.4,"medianWinPct":0.8,"actualRank":5,"medianRank":1,"rankDelta":4},{"manager":"Nicklas Rice","team":"Charlottesville Challengers","games":5,"wins":4,"losses":1,"ties":0,"medianWins":4,"luckRating":0,"luckyWins":1,"unluckyLosses":1,"deservedWins":3,"deservedLosses":0,"pointsFor":671.24,"pointsAgainst":537.76,"avgPF":134.25,"allPlayWins":29,"allPlayWinPct":0.644444444444445,"actualWinPct":0.8,"medianWinPct":0.8,"actualRank":1,"medianRank":1,"rankDelta":0},{"manager":"Ronald Daragjati","team":"Regi nald","games":5,"wins":1,"losses":4,"ties":0,"medianWins":1,"luckRating":0,"luckyWins":1,"unluckyLosses":1,"deservedWins":0,"deservedLosses":3,"pointsFor":494.06,"pointsAgainst":649.42,"avgPF":98.81,"allPlayWins":7,"allPlayWinPct":0.155555555555556,"actualWinPct":0.2,"medianWinPct":0.2,"actualRank":10,"medianRank":9,"rankDelta":1},{"manager":"Nick Campbell","team":"Nasty","games":5,"wins":2,"losses":3,"ties":0,"medianWins":3,"luckRating":-1,"luckyWins":1,"unluckyLosses":2,"deservedWins":1,"deservedLosses":1,"pointsFor":648.46,"pointsAgainst":660.32,"avgPF":129.69,"allPlayWins":24,"allPlayWinPct":0.533333333333333,"actualWinPct":0.4,"medianWinPct":0.6,"actualRank":5,"medianRank":3,"rankDelta":2},{"manager":"Andrew Ferris","team":"Quaheato's Deli","games":5,"wins":2,"losses":3,"ties":0,"medianWins":2,"luckRating":0,"luckyWins":0,"unluckyLosses":0,"deservedWins":2,"deservedLosses":3,"pointsFor":661.24,"pointsAgainst":625.66,"avgPF":132.25,"allPlayWins":23,"allPlayWinPct":0.511111111111111,"actualWinPct":0.4,"medianWinPct":0.4,"actualRank":5,"medianRank":6,"rankDelta":-1},{"manager":"Holden Bilbrey","team":"Shough Me To Tears","games":5,"wins":2,"losses":3,"ties":0,"medianWins":1,"luckRating":1,"luckyWins":1,"unluckyLosses":0,"deservedWins":1,"deservedLosses":3,"pointsFor":571.66,"pointsAgainst":677.1,"avgPF":114.33,"allPlayWins":14,"allPlayWinPct":0.311111111111111,"actualWinPct":0.4,"medianWinPct":0.2,"actualRank":5,"medianRank":9,"rankDelta":-4},{"manager":"Ohm Parikh","team":"Allagash White Soopremacy","games":5,"wins":3,"losses":2,"ties":0,"medianWins":3,"luckRating":0,"luckyWins":0,"unluckyLosses":0,"deservedWins":3,"deservedLosses":2,"pointsFor":690.1,"pointsAgainst":637.22,"avgPF":138.02,"allPlayWins":30,"allPlayWinPct":0.666666666666667,"actualWinPct":0.6,"medianWinPct":0.6,"actualRank":3,"medianRank":3,"rankDelta":0},{"manager":"Lucas Jones","team":"Chronic Traumatic Encephs","games":5,"wins":3,"losses":2,"ties":0,"medianWins":3,"luckRating":0,"luckyWins":0,"unluckyLosses":0,"deservedWins":3,"deservedLosses":2,"pointsFor":627.22,"pointsAgainst":581.46,"avgPF":125.44,"allPlayWins":25,"allPlayWinPct":0.555555555555556,"actualWinPct":0.6,"medianWinPct":0.6,"actualRank":3,"medianRank":3,"rankDelta":0},{"manager":"Trevor Chesser","team":"Koo Cooks Klan","games":5,"wins":2,"losses":3,"ties":0,"medianWins":2,"luckRating":0,"luckyWins":0,"unluckyLosses":0,"deservedWins":2,"deservedLosses":3,"pointsFor":641.18,"pointsAgainst":657.88,"avgPF":128.24,"allPlayWins":23,"allPlayWinPct":0.511111111111111,"actualWinPct":0.4,"medianWinPct":0.4,"actualRank":5,"medianRank":6,"rankDelta":-1},{"manager":"Spencer","team":"Richard Scrote Jamal","games":5,"wins":4,"losses":1,"ties":0,"medianWins":2,"luckRating":2,"luckyWins":2,"unluckyLosses":0,"deservedWins":2,"deservedLosses":1,"pointsFor":641.26,"pointsAgainst":630.8,"avgPF":128.25,"allPlayWins":22,"allPlayWinPct":0.488888888888889,"actualWinPct":0.8,"medianWinPct":0.4,"actualRank":1,"medianRank":6,"rankDelta":-5}],"log":[{"week":1,"manager":"Ronald Daragjati","team":"Regi nald","oppManager":"Spencer","oppTeam":"Richard Scrote Jamal","pf":115,"pa":119.06,"margin":-4.06,"winValue":0,"result":"Loss","weekMedian":124.36,"beatMedian":0,"marginVsMedian":-9.36,"luck":"Deserved Loss","teamsBeaten":1},{"week":1,"manager":"Spencer","team":"Richard Scrote Jamal","oppManager":"Ronald Daragjati","oppTeam":"Regi nald","pf":119.06,"pa":115,"margin":4.06,"winValue":1,"result":"Win","weekMedian":124.36,"beatMedian":0,"marginVsMedian":-5.3,"luck":"Lucky Win","teamsBeaten":3},{"week":1,"manager":"Lucas Jones","team":"Chronic Traumatic Encephs","oppManager":"Nick Campbell","oppTeam":"Nasty","pf":143.82,"pa":125.12,"margin":18.7,"winValue":1,"result":"Win","weekMedian":124.36,"beatMedian":1,"marginVsMedian":19.46,"luck":"Deserved Win","teamsBeaten":8},{"week":1,"manager":"Nick Campbell","team":"Nasty","oppManager":"Lucas Jones","oppTeam":"Chronic Traumatic Encephs","pf":125.12,"pa":143.82,"margin":-18.7,"winValue":0,"result":"Loss","weekMedian":124.36,"beatMedian":1,"marginVsMedian":0.76,"luck":"Unlucky Loss","teamsBeaten":5},{"week":1,"manager":"Trevor Chesser","team":"Koo Cooks Klan","oppManager":"Ohm Parikh","oppTeam":"Allagash White Soopremacy","pf":123.6,"pa":144.56,"margin":-20.96,"winValue":0,"result":"Loss","weekMedian":124.36,"beatMedian":0,"marginVsMedian":-0.76,"luck":"Deserved Loss","teamsBeaten":4},{"week":1,"manager":"Ohm Parikh","team":"Allagash White Soopremacy","oppManager":"Trevor Chesser","oppTeam":"Koo Cooks Klan","pf":144.56,"pa":123.6,"margin":20.96,"winValue":1,"result":"Win","weekMedian":124.36,"beatMedian":1,"marginVsMedian":20.2,"luck":"Deserved Win","teamsBeaten":9},{"week":1,"manager":"Nicklas Rice","team":"Charlottesville Challengers","oppManager":"Holden Bilbrey","oppTeam":"Shough Me To Tears","pf":129.6,"pa":105.06,"margin":24.54,"winValue":1,"result":"Win","weekMedian":124.36,"beatMedian":1,"marginVsMedian":5.24,"luck":"Deserved Win","teamsBeaten":6},{"week":1,"manager":"Holden Bilbrey","team":"Shough Me To Tears","oppManager":"Nicklas Rice","oppTeam":"Charlottesville Challengers","pf":105.06,"pa":129.6,"margin":-24.54,"winValue":0,"result":"Loss","weekMedian":124.36,"beatMedian":0,"marginVsMedian":-19.3,"luck":"Deserved Loss","teamsBeaten":0},{"week":1,"manager":"Will Ferris","team":"THE BROCK","oppManager":"Andrew Ferris","oppTeam":"Quaheato's Deli","pf":132.26,"pa":115.76,"margin":16.5,"winValue":1,"result":"Win","weekMedian":124.36,"beatMedian":1,"marginVsMedian":7.9,"luck":"Deserved Win","teamsBeaten":7},{"week":1,"manager":"Andrew Ferris","team":"Quaheato's Deli","oppManager":"Will Ferris","oppTeam":"THE BROCK","pf":115.76,"pa":132.26,"margin":-16.5,"winValue":0,"result":"Loss","weekMedian":124.36,"beatMedian":0,"marginVsMedian":-8.6,"luck":"Deserved Loss","teamsBeaten":2},{"week":2,"manager":"Andrew Ferris","team":"Quaheato's Deli","oppManager":"Spencer","oppTeam":"Richard Scrote Jamal","pf":121.48,"pa":121.54,"margin":-0.06,"winValue":0,"result":"Loss","weekMedian":122.56,"beatMedian":0,"marginVsMedian":-1.08,"luck":"Deserved Loss","teamsBeaten":3},{"week":2,"manager":"Spencer","team":"Richard Scrote Jamal","oppManager":"Andrew Ferris","oppTeam":"Quaheato's Deli","pf":121.54,"pa":121.48,"margin":0.06,"winValue":1,"result":"Win","weekMedian":122.56,"beatMedian":0,"marginVsMedian":-1.02,"luck":"Lucky Win","teamsBeaten":4},{"week":2,"manager":"Trevor Chesser","team":"Koo Cooks Klan","oppManager":"Lucas Jones","oppTeam":"Chronic Traumatic Encephs","pf":106.38,"pa":135.06,"margin":-28.68,"winValue":0,"result":"Loss","weekMedian":122.56,"beatMedian":0,"marginVsMedian":-16.18,"luck":"Deserved Loss","teamsBeaten":2},{"week":2,"manager":"Lucas Jones","team":"Chronic Traumatic Encephs","oppManager":"Trevor Chesser","oppTeam":"Koo Cooks Klan","pf":135.06,"pa":106.38,"margin":28.68,"winValue":1,"result":"Win","weekMedian":122.56,"beatMedian":1,"marginVsMedian":12.5,"luck":"Deserved Win","teamsBeaten":8},{"week":2,"manager":"Nick Campbell","team":"Nasty","oppManager":"Nicklas Rice","oppTeam":"Charlottesville Challengers","pf":101.38,"pa":129.96,"margin":-28.58,"winValue":0,"result":"Loss","weekMedian":122.56,"beatMedian":0,"marginVsMedian":-21.18,"luck":"Deserved Loss","teamsBeaten":1},{"week":2,"manager":"Nicklas Rice","team":"Charlottesville Challengers","oppManager":"Nick Campbell","oppTeam":"Nasty","pf":129.96,"pa":101.38,"margin":28.58,"winValue":1,"result":"Win","weekMedian":122.56,"beatMedian":1,"marginVsMedian":7.4,"luck":"Deserved Win","teamsBeaten":6},{"week":2,"manager":"Ohm Parikh","team":"Allagash White Soopremacy","oppManager":"Will Ferris","oppTeam":"THE BROCK","pf":89.42,"pa":134.5,"margin":-45.08,"winValue":0,"result":"Loss","weekMedian":122.56,"beatMedian":0,"marginVsMedian":-33.14,"luck":"Deserved Loss","teamsBeaten":0},{"week":2,"manager":"Will Ferris","team":"THE BROCK","oppManager":"Ohm Parikh","oppTeam":"Allagash White Soopremacy","pf":134.5,"pa":89.42,"margin":45.08,"winValue":1,"result":"Win","weekMedian":122.56,"beatMedian":1,"marginVsMedian":11.94,"luck":"Deserved Win","teamsBeaten":7},{"week":2,"manager":"Holden Bilbrey","team":"Shough Me To Tears","oppManager":"Ronald Daragjati","oppTeam":"Regi nald","pf":146.52,"pa":123.58,"margin":22.94,"winValue":1,"result":"Win","weekMedian":122.56,"beatMedian":1,"marginVsMedian":23.96,"luck":"Deserved Win","teamsBeaten":9},{"week":2,"manager":"Ronald Daragjati","team":"Regi nald","oppManager":"Holden Bilbrey","oppTeam":"Shough Me To Tears","pf":123.58,"pa":146.52,"margin":-22.94,"winValue":0,"result":"Loss","weekMedian":122.56,"beatMedian":1,"marginVsMedian":1.02,"luck":"Unlucky Loss","teamsBeaten":5},{"week":3,"manager":"Spencer","team":"Richard Scrote Jamal","oppManager":"Ohm Parikh","oppTeam":"Allagash White Soopremacy","pf":131.34,"pa":105.32,"margin":26.02,"winValue":1,"result":"Win","weekMedian":124.77,"beatMedian":1,"marginVsMedian":6.57,"luck":"Deserved Win","teamsBeaten":6},{"week":3,"manager":"Ohm Parikh","team":"Allagash White Soopremacy","oppManager":"Spencer","oppTeam":"Richard Scrote Jamal","pf":105.32,"pa":131.34,"margin":-26.02,"winValue":0,"result":"Loss","weekMedian":124.77,"beatMedian":0,"marginVsMedian":-19.45,"luck":"Deserved Loss","teamsBeaten":3},{"week":3,"manager":"Lucas Jones","team":"Chronic Traumatic Encephs","oppManager":"Nicklas Rice","oppTeam":"Charlottesville Challengers","pf":102.02,"pa":118.84,"margin":-16.82,"winValue":0,"result":"Loss","weekMedian":124.77,"beatMedian":0,"marginVsMedian":-22.75,"luck":"Deserved Loss","teamsBeaten":2},{"week":3,"manager":"Nicklas Rice","team":"Charlottesville Challengers","oppManager":"Lucas Jones","oppTeam":"Chronic Traumatic Encephs","pf":118.84,"pa":102.02,"margin":16.82,"winValue":1,"result":"Win","weekMedian":124.77,"beatMedian":0,"marginVsMedian":-5.93,"luck":"Lucky Win","teamsBeaten":4},{"week":3,"manager":"Will Ferris","team":"THE BROCK","oppManager":"Trevor Chesser","oppTeam":"Koo Cooks Klan","pf":130.7,"pa":143.5,"margin":-12.8,"winValue":0,"result":"Loss","weekMedian":124.77,"beatMedian":1,"marginVsMedian":5.93,"luck":"Unlucky Loss","teamsBeaten":5},{"week":3,"manager":"Trevor Chesser","team":"Koo Cooks Klan","oppManager":"Will Ferris","oppTeam":"THE BROCK","pf":143.5,"pa":130.7,"margin":12.8,"winValue":1,"result":"Win","weekMedian":124.77,"beatMedian":1,"marginVsMedian":18.73,"luck":"Deserved Win","teamsBeaten":7},{"week":3,"manager":"Ronald Daragjati","team":"Regi nald","oppManager":"Nick Campbell","oppTeam":"Nasty","pf":89.44,"pa":152.04,"margin":-62.6,"winValue":0,"result":"Loss","weekMedian":124.77,"beatMedian":0,"marginVsMedian":-35.33,"luck":"Deserved Loss","teamsBeaten":0},{"week":3,"manager":"Nick Campbell","team":"Nasty","oppManager":"Ronald Daragjati","oppTeam":"Regi nald","pf":152.04,"pa":89.44,"margin":62.6,"winValue":1,"result":"Win","weekMedian":124.77,"beatMedian":1,"marginVsMedian":27.27,"luck":"Deserved Win","teamsBeaten":9},{"week":3,"manager":"Andrew Ferris","team":"Quaheato's Deli","oppManager":"Holden Bilbrey","oppTeam":"Shough Me To Tears","pf":144.48,"pa":92.46,"margin":52.02,"winValue":1,"result":"Win","weekMedian":124.77,"beatMedian":1,"marginVsMedian":19.71,"luck":"Deserved Win","teamsBeaten":8},{"week":3,"manager":"Holden Bilbrey","team":"Shough Me To Tears","oppManager":"Andrew Ferris","oppTeam":"Quaheato's Deli","pf":92.46,"pa":144.48,"margin":-52.02,"winValue":0,"result":"Loss","weekMedian":124.77,"beatMedian":0,"marginVsMedian":-32.31,"luck":"Deserved Loss","teamsBeaten":1},{"week":4,"manager":"Trevor Chesser","team":"Koo Cooks Klan","oppManager":"Spencer","oppTeam":"Richard Scrote Jamal","pf":156.48,"pa":118.86,"margin":37.62,"winValue":1,"result":"Win","weekMedian":125.22,"beatMedian":1,"marginVsMedian":31.26,"luck":"Deserved Win","teamsBeaten":8},{"week":4,"manager":"Spencer","team":"Richard Scrote Jamal","oppManager":"Trevor Chesser","oppTeam":"Koo Cooks Klan","pf":118.86,"pa":156.48,"margin":-37.62,"winValue":0,"result":"Loss","weekMedian":125.22,"beatMedian":0,"marginVsMedian":-6.36,"luck":"Deserved Loss","teamsBeaten":3},{"week":4,"manager":"Will Ferris","team":"THE BROCK","oppManager":"Lucas Jones","oppTeam":"Chronic Traumatic Encephs","pf":129.38,"pa":149.02,"margin":-19.64,"winValue":0,"result":"Loss","weekMedian":125.22,"beatMedian":1,"marginVsMedian":4.16,"luck":"Unlucky Loss","teamsBeaten":5},{"week":4,"manager":"Lucas Jones","team":"Chronic Traumatic Encephs","oppManager":"Will Ferris","oppTeam":"THE BROCK","pf":149.02,"pa":129.38,"margin":19.64,"winValue":1,"result":"Win","weekMedian":125.22,"beatMedian":1,"marginVsMedian":23.8,"luck":"Deserved Win","teamsBeaten":7},{"week":4,"manager":"Nicklas Rice","team":"Charlottesville Challengers","oppManager":"Ronald Daragjati","oppTeam":"Regi nald","pf":134.5,"pa":64.3,"margin":70.2,"winValue":1,"result":"Win","weekMedian":125.22,"beatMedian":1,"marginVsMedian":9.28,"luck":"Deserved Win","teamsBeaten":6},{"week":4,"manager":"Ronald Daragjati","team":"Regi nald","oppManager":"Nicklas Rice","oppTeam":"Charlottesville Challengers","pf":64.3,"pa":134.5,"margin":-70.2,"winValue":0,"result":"Loss","weekMedian":125.22,"beatMedian":0,"marginVsMedian":-60.92,"luck":"Deserved Loss","teamsBeaten":0},{"week":4,"manager":"Nick Campbell","team":"Nasty","oppManager":"Andrew Ferris","oppTeam":"Quaheato's Deli","pf":121.06,"pa":114.52,"margin":6.54,"winValue":1,"result":"Win","weekMedian":125.22,"beatMedian":0,"marginVsMedian":-4.16,"luck":"Lucky Win","teamsBeaten":4},{"week":4,"manager":"Andrew Ferris","team":"Quaheato's Deli","oppManager":"Nick Campbell","oppTeam":"Nasty","pf":114.52,"pa":121.06,"margin":-6.54,"winValue":0,"result":"Loss","weekMedian":125.22,"beatMedian":0,"marginVsMedian":-10.7,"luck":"Deserved Loss","teamsBeaten":2},{"week":4,"manager":"Ohm Parikh","team":"Allagash White Soopremacy","oppManager":"Holden Bilbrey","oppTeam":"Shough Me To Tears","pf":168.22,"pa":98.92,"margin":69.3,"winValue":1,"result":"Win","weekMedian":125.22,"beatMedian":1,"marginVsMedian":43,"luck":"Deserved Win","teamsBeaten":9},{"week":4,"manager":"Holden Bilbrey","team":"Shough Me To Tears","oppManager":"Ohm Parikh","oppTeam":"Allagash White Soopremacy","pf":98.92,"pa":168.22,"margin":-69.3,"winValue":0,"result":"Loss","weekMedian":125.22,"beatMedian":0,"marginVsMedian":-26.3,"luck":"Deserved Loss","teamsBeaten":1},{"week":5,"manager":"Spencer","team":"Richard Scrote Jamal","oppManager":"Will Ferris","oppTeam":"THE BROCK","pf":150.46,"pa":132.52,"margin":17.94,"winValue":1,"result":"Win","weekMedian":140.69,"beatMedian":1,"marginVsMedian":9.77,"luck":"Deserved Win","teamsBeaten":6},{"week":5,"manager":"Will Ferris","team":"THE BROCK","oppManager":"Spencer","oppTeam":"Richard Scrote Jamal","pf":132.52,"pa":150.46,"margin":-17.94,"winValue":0,"result":"Loss","weekMedian":140.69,"beatMedian":0,"marginVsMedian":-8.17,"luck":"Deserved Loss","teamsBeaten":4},{"week":5,"manager":"Lucas Jones","team":"Chronic Traumatic Encephs","oppManager":"Ronald Daragjati","oppTeam":"Regi nald","pf":97.3,"pa":101.74,"margin":-4.44,"winValue":0,"result":"Loss","weekMedian":140.69,"beatMedian":0,"marginVsMedian":-43.39,"luck":"Deserved Loss","teamsBeaten":0},{"week":5,"manager":"Ronald Daragjati","team":"Regi nald","oppManager":"Lucas Jones","oppTeam":"Chronic Traumatic Encephs","pf":101.74,"pa":97.3,"margin":4.44,"winValue":1,"result":"Win","weekMedian":140.69,"beatMedian":0,"marginVsMedian":-38.95,"luck":"Lucky Win","teamsBeaten":1},{"week":5,"manager":"Andrew Ferris","team":"Quaheato's Deli","oppManager":"Nicklas Rice","oppTeam":"Charlottesville Challengers","pf":165,"pa":158.34,"margin":6.66,"winValue":1,"result":"Win","weekMedian":140.69,"beatMedian":1,"marginVsMedian":24.31,"luck":"Deserved Win","teamsBeaten":8},{"week":5,"manager":"Nicklas Rice","team":"Charlottesville Challengers","oppManager":"Andrew Ferris","oppTeam":"Quaheato's Deli","pf":158.34,"pa":165,"margin":-6.66,"winValue":0,"result":"Loss","weekMedian":140.69,"beatMedian":1,"marginVsMedian":17.65,"luck":"Unlucky Loss","teamsBeaten":7},{"week":5,"manager":"Holden Bilbrey","team":"Shough Me To Tears","oppManager":"Trevor Chesser","oppTeam":"Koo Cooks Klan","pf":128.7,"pa":111.22,"margin":17.48,"winValue":1,"result":"Win","weekMedian":140.69,"beatMedian":0,"marginVsMedian":-11.99,"luck":"Lucky Win","teamsBeaten":3},{"week":5,"manager":"Trevor Chesser","team":"Koo Cooks Klan","oppManager":"Holden Bilbrey","oppTeam":"Shough Me To Tears","pf":111.22,"pa":128.7,"margin":-17.48,"winValue":0,"result":"Loss","weekMedian":140.69,"beatMedian":0,"marginVsMedian":-29.47,"luck":"Deserved Loss","teamsBeaten":2},{"week":5,"manager":"Ohm Parikh","team":"Allagash White Soopremacy","oppManager":"Nick Campbell","oppTeam":"Nasty","pf":182.58,"pa":148.86,"margin":33.72,"winValue":1,"result":"Win","weekMedian":140.69,"beatMedian":1,"marginVsMedian":41.89,"luck":"Deserved Win","teamsBeaten":9},{"week":5,"manager":"Nick Campbell","team":"Nasty","oppManager":"Ohm Parikh","oppTeam":"Allagash White Soopremacy","pf":148.86,"pa":182.58,"margin":-33.72,"winValue":0,"result":"Loss","weekMedian":140.69,"beatMedian":1,"marginVsMedian":8.17,"luck":"Unlucky Loss","teamsBeaten":5}],"weekStats":[{"week":1,"games":10,"average":125.38,"median":124.36,"high":144.56,"highScorer":"Allagash White Soopremacy","low":105.06,"lowScorer":"Shough Me To Tears","stdDev":12.6},{"week":2,"games":10,"average":120.98,"median":122.56,"high":146.52,"highScorer":"Shough Me To Tears","low":89.42,"lowScorer":"Allagash White Soopremacy","stdDev":17.4},{"week":3,"games":10,"average":121.01,"median":124.77,"high":152.04,"highScorer":"Nasty","low":89.44,"lowScorer":"Regi nald","stdDev":22.7},{"week":4,"games":10,"average":125.53,"median":125.22,"high":168.22,"highScorer":"Allagash White Soopremacy","low":64.3,"lowScorer":"Regi nald","stdDev":29.9},{"week":5,"games":10,"average":137.67,"median":140.69,"high":182.58,"highScorer":"Allagash White Soopremacy","low":97.3,"lowScorer":"Chronic Traumatic Encephs","stdDev":28.3}]},"2025.26":{"season":"2025.26","weeksLogged":13,"standings":[{"manager":"Spencer","team":"Richard Scrote Jamal","games":13,"wins":10,"losses":2,"ties":1,"medianWins":9,"luckRating":1,"luckyWins":3,"unluckyLosses":1,"deservedWins":7,"deservedLosses":1,"pointsFor":1654.48,"pointsAgainst":1456.32,"avgPF":127.27,"allPlayWins":67,"allPlayWinPct":0.572649572649573,"actualWinPct":0.769230769230769,"medianWinPct":0.692307692307692,"actualRank":1,"medianRank":2,"rankDelta":-1},{"manager":"Andrew","team":"Quaheato's Deli","games":13,"wins":3,"losses":10,"ties":0,"medianWins":5,"luckRating":-2,"luckyWins":0,"unluckyLosses":2,"deservedWins":3,"deservedLosses":8,"pointsFor":1553.02,"pointsAgainst":1700.58,"avgPF":119.46,"allPlayWins":53,"allPlayWinPct":0.452991452991453,"actualWinPct":0.230769230769231,"medianWinPct":0.384615384615385,"actualRank":10,"medianRank":8,"rankDelta":2},{"manager":"Holden","team":"Pete Wiener","games":13,"wins":4,"losses":9,"ties":0,"medianWins":1,"luckRating":3,"luckyWins":3,"unluckyLosses":0,"deservedWins":1,"deservedLosses":9,"pointsFor":1359.54,"pointsAgainst":1561.28,"avgPF":104.58,"allPlayWins":27,"allPlayWinPct":0.230769230769231,"actualWinPct":0.307692307692308,"medianWinPct":0.0769230769230769,"actualRank":8,"medianRank":10,"rankDelta":-2},{"manager":"Trevor","team":"Koo Cooks Klan","games":13,"wins":7,"losses":5,"ties":1,"medianWins":8,"luckRating":-1,"luckyWins":1,"unluckyLosses":1,"deservedWins":6,"deservedLosses":4,"pointsFor":1601.86,"pointsAgainst":1626.76,"avgPF":123.22,"allPlayWins":64,"allPlayWinPct":0.547008547008547,"actualWinPct":0.538461538461538,"medianWinPct":0.615384615384615,"actualRank":4,"medianRank":3,"rankDelta":1},{"manager":"Nicklas","team":"Charlottesville Chargers","games":13,"wins":5,"losses":8,"ties":0,"medianWins":6,"luckRating":-1,"luckyWins":1,"unluckyLosses":2,"deservedWins":4,"deservedLosses":6,"pointsFor":1586.41,"pointsAgainst":1564.96,"avgPF":122.03,"allPlayWins":61,"allPlayWinPct":0.521367521367521,"actualWinPct":0.384615384615385,"medianWinPct":0.461538461538462,"actualRank":7,"medianRank":6,"rankDelta":1},{"manager":"Dilan","team":"Dilan","games":13,"wins":8,"losses":5,"ties":0,"medianWins":8,"luckRating":0,"luckyWins":1,"unluckyLosses":1,"deservedWins":7,"deservedLosses":4,"pointsFor":1610.36,"pointsAgainst":1544.72,"avgPF":123.87,"allPlayWins":66,"allPlayWinPct":0.564102564102564,"actualWinPct":0.615384615384615,"medianWinPct":0.615384615384615,"actualRank":3,"medianRank":3,"rankDelta":0},{"manager":"Will","team":"THE BROCK","games":13,"wins":7,"losses":6,"ties":0,"medianWins":8,"luckRating":-1,"luckyWins":1,"unluckyLosses":2,"deservedWins":6,"deservedLosses":4,"pointsFor":1741.58,"pointsAgainst":1557.62,"avgPF":133.97,"allPlayWins":78,"allPlayWinPct":0.666666666666667,"actualWinPct":0.538461538461538,"medianWinPct":0.615384615384615,"actualRank":4,"medianRank":3,"rankDelta":1},{"manager":"Nasty","team":"Nasty","games":13,"wins":6,"losses":7,"ties":0,"medianWins":6,"luckRating":0,"luckyWins":1,"unluckyLosses":1,"deservedWins":5,"deservedLosses":6,"pointsFor":1476.84,"pointsAgainst":1587.06,"avgPF":113.6,"allPlayWins":50,"allPlayWinPct":0.427350427350427,"actualWinPct":0.461538461538462,"medianWinPct":0.461538461538462,"actualRank":6,"medianRank":6,"rankDelta":0},{"manager":"Ohm","team":"Allagash White Soopremacy","games":13,"wins":4,"losses":9,"ties":0,"medianWins":3,"luckRating":1,"luckyWins":2,"unluckyLosses":1,"deservedWins":2,"deservedLosses":8,"pointsFor":1395.84,"pointsAgainst":1564.96,"avgPF":107.37,"allPlayWins":34,"allPlayWinPct":0.290598290598291,"actualWinPct":0.307692307692308,"medianWinPct":0.230769230769231,"actualRank":8,"medianRank":9,"rankDelta":-1},{"manager":"Ronald","team":"Regi nald","games":13,"wins":10,"losses":3,"ties":0,"medianWins":11,"luckRating":-1,"luckyWins":0,"unluckyLosses":1,"deservedWins":10,"deservedLosses":2,"pointsFor":1779.64,"pointsAgainst":1595.31,"avgPF":136.9,"allPlayWins":84,"allPlayWinPct":0.717948717948718,"actualWinPct":0.769230769230769,"medianWinPct":0.846153846153846,"actualRank":1,"medianRank":1,"rankDelta":0}],"log":[{"week":1,"manager":"Spencer","team":"Richard Scrote Jamal","oppManager":"Andrew","oppTeam":"Quaheato's Deli","pf":131.56,"pa":108.16,"margin":23.4,"winValue":1,"result":"Win","weekMedian":111.59,"beatMedian":1,"marginVsMedian":19.97,"luck":"Deserved Win","teamsBeaten":7},{"week":1,"manager":"Andrew","team":"Quaheato's Deli","oppManager":"Spencer","oppTeam":"Richard Scrote Jamal","pf":108.16,"pa":131.56,"margin":-23.4,"winValue":0,"result":"Loss","weekMedian":111.59,"beatMedian":0,"marginVsMedian":-3.43000000000001,"luck":"Deserved Loss","teamsBeaten":2},{"week":1,"manager":"Holden","team":"Pete Wiener","oppManager":"Trevor","oppTeam":"Koo Cooks Klan","pf":108.58,"pa":114.6,"margin":-6.02,"winValue":0,"result":"Loss","weekMedian":111.59,"beatMedian":0,"marginVsMedian":-3.01000000000001,"luck":"Deserved Loss","teamsBeaten":4},{"week":1,"manager":"Trevor","team":"Koo Cooks Klan","oppManager":"Holden","oppTeam":"Pete Wiener","pf":114.6,"pa":108.58,"margin":6.02,"winValue":1,"result":"Win","weekMedian":111.59,"beatMedian":1,"marginVsMedian":3.00999999999999,"luck":"Deserved Win","teamsBeaten":5},{"week":1,"manager":"Nicklas","team":"Charlottesville Chargers","oppManager":"Dilan","oppTeam":"Dilan","pf":108.18,"pa":124.84,"margin":-16.66,"winValue":0,"result":"Loss","weekMedian":111.59,"beatMedian":0,"marginVsMedian":-3.41,"luck":"Deserved Loss","teamsBeaten":3},{"week":1,"manager":"Dilan","team":"Dilan","oppManager":"Nicklas","oppTeam":"Charlottesville Chargers","pf":124.84,"pa":108.18,"margin":16.66,"winValue":1,"result":"Win","weekMedian":111.59,"beatMedian":1,"marginVsMedian":13.25,"luck":"Deserved Win","teamsBeaten":6},{"week":1,"manager":"Will","team":"THE BROCK","oppManager":"Nasty","oppTeam":"Nasty","pf":100.62,"pa":87.82,"margin":12.8,"winValue":1,"result":"Win","weekMedian":111.59,"beatMedian":0,"marginVsMedian":-10.97,"luck":"Lucky Win","teamsBeaten":1},{"week":1,"manager":"Nasty","team":"Nasty","oppManager":"Will","oppTeam":"THE BROCK","pf":87.82,"pa":100.62,"margin":-12.8,"winValue":0,"result":"Loss","weekMedian":111.59,"beatMedian":0,"marginVsMedian":-23.77,"luck":"Deserved Loss","teamsBeaten":0},{"week":1,"manager":"Ohm","team":"Allagash White Soopremacy","oppManager":"Ronald","oppTeam":"Regi nald","pf":140.58,"pa":172.26,"margin":-31.68,"winValue":0,"result":"Loss","weekMedian":111.59,"beatMedian":1,"marginVsMedian":28.99,"luck":"Unlucky Loss","teamsBeaten":8},{"week":1,"manager":"Ronald","team":"Regi nald","oppManager":"Ohm","oppTeam":"Allagash White Soopremacy","pf":172.26,"pa":140.58,"margin":31.68,"winValue":1,"result":"Win","weekMedian":111.59,"beatMedian":1,"marginVsMedian":60.67,"luck":"Deserved Win","teamsBeaten":9},{"week":2,"manager":"Spencer","team":"Richard Scrote Jamal","oppManager":"Holden","oppTeam":"Pete Wiener","pf":135.54,"pa":108.6,"margin":26.94,"winValue":1,"result":"Win","weekMedian":111.86,"beatMedian":1,"marginVsMedian":23.68,"luck":"Deserved Win","teamsBeaten":7},{"week":2,"manager":"Andrew","team":"Quaheato's Deli","oppManager":"Nicklas","oppTeam":"Charlottesville Chargers","pf":97.74,"pa":144.3,"margin":-46.56,"winValue":0,"result":"Loss","weekMedian":111.86,"beatMedian":0,"marginVsMedian":-14.12,"luck":"Deserved Loss","teamsBeaten":1},{"week":2,"manager":"Holden","team":"Pete Wiener","oppManager":"Spencer","oppTeam":"Richard Scrote Jamal","pf":108.6,"pa":135.54,"margin":-26.94,"winValue":0,"result":"Loss","weekMedian":111.86,"beatMedian":0,"marginVsMedian":-3.26000000000001,"luck":"Deserved Loss","teamsBeaten":3},{"week":2,"manager":"Trevor","team":"Koo Cooks Klan","oppManager":"Will","oppTeam":"THE BROCK","pf":100.6,"pa":139.9,"margin":-39.3,"winValue":0,"result":"Loss","weekMedian":111.86,"beatMedian":0,"marginVsMedian":-11.26,"luck":"Deserved Loss","teamsBeaten":2},{"week":2,"manager":"Nicklas","team":"Charlottesville Chargers","oppManager":"Andrew","oppTeam":"Quaheato's Deli","pf":144.3,"pa":97.74,"margin":46.56,"winValue":1,"result":"Win","weekMedian":111.86,"beatMedian":1,"marginVsMedian":32.44,"luck":"Deserved Win","teamsBeaten":9},{"week":2,"manager":"Dilan","team":"Dilan","oppManager":"Ohm","oppTeam":"Allagash White Soopremacy","pf":111.14,"pa":94.5,"margin":16.64,"winValue":1,"result":"Win","weekMedian":111.86,"beatMedian":0,"marginVsMedian":-0.719999999999999,"luck":"Lucky Win","teamsBeaten":4},{"week":2,"manager":"Will","team":"THE BROCK","oppManager":"Trevor","oppTeam":"Koo Cooks Klan","pf":139.9,"pa":100.6,"margin":39.3,"winValue":1,"result":"Win","weekMedian":111.86,"beatMedian":1,"marginVsMedian":28.04,"luck":"Deserved Win","teamsBeaten":8},{"week":2,"manager":"Nasty","team":"Nasty","oppManager":"Ronald","oppTeam":"Regi nald","pf":112.58,"pa":128.22,"margin":-15.64,"winValue":0,"result":"Loss","weekMedian":111.86,"beatMedian":1,"marginVsMedian":0.719999999999999,"luck":"Unlucky Loss","teamsBeaten":5},{"week":2,"manager":"Ohm","team":"Allagash White Soopremacy","oppManager":"Dilan","oppTeam":"Dilan","pf":94.5,"pa":111.14,"margin":-16.64,"winValue":0,"result":"Loss","weekMedian":111.86,"beatMedian":0,"marginVsMedian":-17.36,"luck":"Deserved Loss","teamsBeaten":0},{"week":2,"manager":"Ronald","team":"Regi nald","oppManager":"Nasty","oppTeam":"Nasty","pf":128.22,"pa":112.58,"margin":15.64,"winValue":1,"result":"Win","weekMedian":111.86,"beatMedian":1,"marginVsMedian":16.36,"luck":"Deserved Win","teamsBeaten":6},{"week":3,"manager":"Spencer","team":"Richard Scrote Jamal","oppManager":"Nicklas","oppTeam":"Charlottesville Chargers","pf":147.04,"pa":94.62,"margin":52.42,"winValue":1,"result":"Win","weekMedian":118.29,"beatMedian":1,"marginVsMedian":28.75,"luck":"Deserved Win","teamsBeaten":8},{"week":3,"manager":"Andrew","team":"Quaheato's Deli","oppManager":"Ohm","oppTeam":"Allagash White Soopremacy","pf":111.08,"pa":113.56,"margin":-2.48,"winValue":0,"result":"Loss","weekMedian":118.29,"beatMedian":0,"marginVsMedian":-7.20999999999999,"luck":"Deserved Loss","teamsBeaten":3},{"week":3,"manager":"Holden","team":"Pete Wiener","oppManager":"Will","oppTeam":"THE BROCK","pf":94.22,"pa":156.82,"margin":-62.6,"winValue":0,"result":"Loss","weekMedian":118.29,"beatMedian":0,"marginVsMedian":-24.07,"luck":"Deserved Loss","teamsBeaten":0},{"week":3,"manager":"Trevor","team":"Koo Cooks Klan","oppManager":"Ronald","oppTeam":"Regi nald","pf":124.82,"pa":123.02,"margin":1.8,"winValue":1,"result":"Win","weekMedian":118.29,"beatMedian":1,"marginVsMedian":6.53,"luck":"Deserved Win","teamsBeaten":6},{"week":3,"manager":"Nicklas","team":"Charlottesville Chargers","oppManager":"Spencer","oppTeam":"Richard Scrote Jamal","pf":94.62,"pa":147.04,"margin":-52.42,"winValue":0,"result":"Loss","weekMedian":118.29,"beatMedian":0,"marginVsMedian":-23.67,"luck":"Deserved Loss","teamsBeaten":1},{"week":3,"manager":"Dilan","team":"Dilan","oppManager":"Nasty","oppTeam":"Nasty","pf":142.62,"pa":98.76,"margin":43.86,"winValue":1,"result":"Win","weekMedian":118.29,"beatMedian":1,"marginVsMedian":24.33,"luck":"Deserved Win","teamsBeaten":7},{"week":3,"manager":"Will","team":"THE BROCK","oppManager":"Holden","oppTeam":"Pete Wiener","pf":156.82,"pa":94.22,"margin":62.6,"winValue":1,"result":"Win","weekMedian":118.29,"beatMedian":1,"marginVsMedian":38.53,"luck":"Deserved Win","teamsBeaten":9},{"week":3,"manager":"Nasty","team":"Nasty","oppManager":"Dilan","oppTeam":"Dilan","pf":98.76,"pa":142.62,"margin":-43.86,"winValue":0,"result":"Loss","weekMedian":118.29,"beatMedian":0,"marginVsMedian":-19.53,"luck":"Deserved Loss","teamsBeaten":2},{"week":3,"manager":"Ohm","team":"Allagash White Soopremacy","oppManager":"Andrew","oppTeam":"Quaheato's Deli","pf":113.56,"pa":111.08,"margin":2.48,"winValue":1,"result":"Win","weekMedian":118.29,"beatMedian":0,"marginVsMedian":-4.72999999999999,"luck":"Lucky Win","teamsBeaten":4},{"week":3,"manager":"Ronald","team":"Regi nald","oppManager":"Trevor","oppTeam":"Koo Cooks Klan","pf":123.02,"pa":124.82,"margin":-1.8,"winValue":0,"result":"Loss","weekMedian":118.29,"beatMedian":1,"marginVsMedian":4.73,"luck":"Unlucky Loss","teamsBeaten":5},{"week":4,"manager":"Spencer","team":"Richard Scrote Jamal","oppManager":"Will","oppTeam":"THE BROCK","pf":135.9,"pa":121.08,"margin":14.82,"winValue":1,"result":"Win","weekMedian":126.17,"beatMedian":1,"marginVsMedian":9.73000000000002,"luck":"Deserved Win","teamsBeaten":6},{"week":4,"manager":"Andrew","team":"Quaheato's Deli","oppManager":"Nasty","oppTeam":"Nasty","pf":102.12,"pa":150.8,"margin":-48.68,"winValue":0,"result":"Loss","weekMedian":126.17,"beatMedian":0,"marginVsMedian":-24.05,"luck":"Deserved Loss","teamsBeaten":0},{"week":4,"manager":"Holden","team":"Pete Wiener","oppManager":"Ronald","oppTeam":"Regi nald","pf":107.08,"pa":140.46,"margin":-33.38,"winValue":0,"result":"Loss","weekMedian":126.17,"beatMedian":0,"marginVsMedian":-19.09,"luck":"Deserved Loss","teamsBeaten":1},{"week":4,"manager":"Trevor","team":"Koo Cooks Klan","oppManager":"Dilan","oppTeam":"Dilan","pf":131.26,"pa":144.92,"margin":-13.66,"winValue":0,"result":"Loss","weekMedian":126.17,"beatMedian":1,"marginVsMedian":5.09,"luck":"Unlucky Loss","teamsBeaten":5},{"week":4,"manager":"Nicklas","team":"Charlottesville Chargers","oppManager":"Ohm","oppTeam":"Allagash White Soopremacy","pf":107.82,"pa":119,"margin":-11.18,"winValue":0,"result":"Loss","weekMedian":126.17,"beatMedian":0,"marginVsMedian":-18.35,"luck":"Deserved Loss","teamsBeaten":2},{"week":4,"manager":"Dilan","team":"Dilan","oppManager":"Trevor","oppTeam":"Koo Cooks Klan","pf":144.92,"pa":131.26,"margin":13.66,"winValue":1,"result":"Win","weekMedian":126.17,"beatMedian":1,"marginVsMedian":18.75,"luck":"Deserved Win","teamsBeaten":8},{"week":4,"manager":"Will","team":"THE BROCK","oppManager":"Spencer","oppTeam":"Richard Scrote Jamal","pf":121.08,"pa":135.9,"margin":-14.82,"winValue":0,"result":"Loss","weekMedian":126.17,"beatMedian":0,"marginVsMedian":-5.08999999999999,"luck":"Deserved Loss","teamsBeaten":4},{"week":4,"manager":"Nasty","team":"Nasty","oppManager":"Andrew","oppTeam":"Quaheato's Deli","pf":150.8,"pa":102.12,"margin":48.68,"winValue":1,"result":"Win","weekMedian":126.17,"beatMedian":1,"marginVsMedian":24.63,"luck":"Deserved Win","teamsBeaten":9},{"week":4,"manager":"Ohm","team":"Allagash White Soopremacy","oppManager":"Nicklas","oppTeam":"Charlottesville Chargers","pf":119,"pa":107.82,"margin":11.18,"winValue":1,"result":"Win","weekMedian":126.17,"beatMedian":0,"marginVsMedian":-7.16999999999999,"luck":"Lucky Win","teamsBeaten":3},{"week":4,"manager":"Ronald","team":"Regi nald","oppManager":"Holden","oppTeam":"Pete Wiener","pf":140.46,"pa":107.08,"margin":33.38,"winValue":1,"result":"Win","weekMedian":126.17,"beatMedian":1,"marginVsMedian":14.29,"luck":"Deserved Win","teamsBeaten":7},{"week":5,"manager":"Spencer","team":"Richard Scrote Jamal","oppManager":"Ohm","oppTeam":"Allagash White Soopremacy","pf":110.4,"pa":103.8,"margin":6.60000000000001,"winValue":1,"result":"Win","weekMedian":119.47,"beatMedian":0,"marginVsMedian":-9.06999999999999,"luck":"Lucky Win","teamsBeaten":2},{"week":5,"manager":"Andrew","team":"Quaheato's Deli","oppManager":"Trevor","oppTeam":"Koo Cooks Klan","pf":128.22,"pa":135.96,"margin":-7.74000000000001,"winValue":0,"result":"Loss","weekMedian":119.47,"beatMedian":1,"marginVsMedian":8.75,"luck":"Unlucky Loss","teamsBeaten":5},{"week":5,"manager":"Holden","team":"Pete Wiener","oppManager":"Dilan","oppTeam":"Dilan","pf":110.44,"pa":99.94,"margin":10.5,"winValue":1,"result":"Win","weekMedian":119.47,"beatMedian":0,"marginVsMedian":-9.03,"luck":"Lucky Win","teamsBeaten":3},{"week":5,"manager":"Trevor","team":"Koo Cooks Klan","oppManager":"Andrew","oppTeam":"Quaheato's Deli","pf":135.96,"pa":128.22,"margin":7.74000000000001,"winValue":1,"result":"Win","weekMedian":119.47,"beatMedian":1,"marginVsMedian":16.49,"luck":"Deserved Win","teamsBeaten":7},{"week":5,"manager":"Nicklas","team":"Charlottesville Chargers","oppManager":"Nasty","oppTeam":"Nasty","pf":110.72,"pa":131.02,"margin":-20.3,"winValue":0,"result":"Loss","weekMedian":119.47,"beatMedian":0,"marginVsMedian":-8.75,"luck":"Deserved Loss","teamsBeaten":4},{"week":5,"manager":"Dilan","team":"Dilan","oppManager":"Holden","oppTeam":"Pete Wiener","pf":99.94,"pa":110.44,"margin":-10.5,"winValue":0,"result":"Loss","weekMedian":119.47,"beatMedian":0,"marginVsMedian":-19.53,"luck":"Deserved Loss","teamsBeaten":0},{"week":5,"manager":"Will","team":"THE BROCK","oppManager":"Ronald","oppTeam":"Regi nald","pf":148.26,"pa":148.62,"margin":-0.360000000000014,"winValue":0,"result":"Loss","weekMedian":119.47,"beatMedian":1,"marginVsMedian":28.79,"luck":"Unlucky Loss","teamsBeaten":8},{"week":5,"manager":"Nasty","team":"Nasty","oppManager":"Nicklas","oppTeam":"Charlottesville Chargers","pf":131.02,"pa":110.72,"margin":20.3,"winValue":1,"result":"Win","weekMedian":119.47,"beatMedian":1,"marginVsMedian":11.55,"luck":"Deserved Win","teamsBeaten":6},{"week":5,"manager":"Ohm","team":"Allagash White Soopremacy","oppManager":"Spencer","oppTeam":"Richard Scrote Jamal","pf":103.8,"pa":110.4,"margin":-6.60000000000001,"winValue":0,"result":"Loss","weekMedian":119.47,"beatMedian":0,"marginVsMedian":-15.67,"luck":"Deserved Loss","teamsBeaten":1},{"week":5,"manager":"Ronald","team":"Regi nald","oppManager":"Will","oppTeam":"THE BROCK","pf":148.62,"pa":148.26,"margin":0.360000000000014,"winValue":1,"result":"Win","weekMedian":119.47,"beatMedian":1,"marginVsMedian":29.15,"luck":"Deserved Win","teamsBeaten":9},{"week":6,"manager":"Spencer","team":"Richard Scrote Jamal","oppManager":"Ronald","oppTeam":"Regi nald","pf":98.22,"pa":93.6,"margin":4.62,"winValue":1,"result":"Win","weekMedian":120.93,"beatMedian":0,"marginVsMedian":-22.71,"luck":"Lucky Win","teamsBeaten":1},{"week":6,"manager":"Andrew","team":"Quaheato's Deli","oppManager":"Holden","oppTeam":"Pete Wiener","pf":112.22,"pa":129.64,"margin":-17.42,"winValue":0,"result":"Loss","weekMedian":120.93,"beatMedian":0,"marginVsMedian":-8.70999999999999,"luck":"Deserved Loss","teamsBeaten":4},{"week":6,"manager":"Holden","team":"Pete Wiener","oppManager":"Andrew","oppTeam":"Quaheato's Deli","pf":129.64,"pa":112.22,"margin":17.42,"winValue":1,"result":"Win","weekMedian":120.93,"beatMedian":1,"marginVsMedian":8.70999999999999,"luck":"Deserved Win","teamsBeaten":5},{"week":6,"manager":"Trevor","team":"Koo Cooks Klan","oppManager":"Nicklas","oppTeam":"Charlottesville Chargers","pf":143.94,"pa":137.86,"margin":6.07999999999998,"winValue":1,"result":"Win","weekMedian":120.93,"beatMedian":1,"marginVsMedian":23.01,"luck":"Deserved Win","teamsBeaten":7},{"week":6,"manager":"Nicklas","team":"Charlottesville Chargers","oppManager":"Trevor","oppTeam":"Koo Cooks Klan","pf":137.86,"pa":143.94,"margin":-6.07999999999998,"winValue":0,"result":"Loss","weekMedian":120.93,"beatMedian":1,"marginVsMedian":16.93,"luck":"Unlucky Loss","teamsBeaten":6},{"week":6,"manager":"Dilan","team":"Dilan","oppManager":"Will","oppTeam":"THE BROCK","pf":107.66,"pa":154.04,"margin":-46.38,"winValue":0,"result":"Loss","weekMedian":120.93,"beatMedian":0,"marginVsMedian":-13.27,"luck":"Deserved Loss","teamsBeaten":3},{"week":6,"manager":"Will","team":"THE BROCK","oppManager":"Dilan","oppTeam":"Dilan","pf":154.04,"pa":107.66,"margin":46.38,"winValue":1,"result":"Win","weekMedian":120.93,"beatMedian":1,"marginVsMedian":33.11,"luck":"Deserved Win","teamsBeaten":9},{"week":6,"manager":"Nasty","team":"Nasty","oppManager":"Ohm","oppTeam":"Allagash White Soopremacy","pf":145.28,"pa":98.98,"margin":46.3,"winValue":1,"result":"Win","weekMedian":120.93,"beatMedian":1,"marginVsMedian":24.35,"luck":"Deserved Win","teamsBeaten":8},{"week":6,"manager":"Ohm","team":"Allagash White Soopremacy","oppManager":"Nasty","oppTeam":"Nasty","pf":98.98,"pa":145.28,"margin":-46.3,"winValue":0,"result":"Loss","weekMedian":120.93,"beatMedian":0,"marginVsMedian":-21.95,"luck":"Deserved Loss","teamsBeaten":2},{"week":6,"manager":"Ronald","team":"Regi nald","oppManager":"Spencer","oppTeam":"Richard Scrote Jamal","pf":93.6,"pa":98.22,"margin":-4.62,"winValue":0,"result":"Loss","weekMedian":120.93,"beatMedian":0,"marginVsMedian":-27.33,"luck":"Deserved Loss","teamsBeaten":0},{"week":7,"manager":"Spencer","team":"Richard Scrote Jamal","oppManager":"Nasty","oppTeam":"Nasty","pf":126.64,"pa":135.44,"margin":-8.8,"winValue":0,"result":"Loss","weekMedian":121.56,"beatMedian":1,"marginVsMedian":5.08,"luck":"Unlucky Loss","teamsBeaten":5},{"week":7,"manager":"Andrew","team":"Quaheato's Deli","oppManager":"Will","oppTeam":"THE BROCK","pf":107.84,"pa":188.58,"margin":-80.74,"winValue":0,"result":"Loss","weekMedian":121.56,"beatMedian":0,"marginVsMedian":-13.72,"luck":"Deserved Loss","teamsBeaten":3},{"week":7,"manager":"Holden","team":"Pete Wiener","oppManager":"Nicklas","oppTeam":"Charlottesville Chargers","pf":94.54,"pa":116.48,"margin":-21.94,"winValue":0,"result":"Loss","weekMedian":121.56,"beatMedian":0,"marginVsMedian":-27.02,"luck":"Deserved Loss","teamsBeaten":1},{"week":7,"manager":"Trevor","team":"Koo Cooks Klan","oppManager":"Ohm","oppTeam":"Allagash White Soopremacy","pf":97.32,"pa":92.38,"margin":4.94,"winValue":1,"result":"Win","weekMedian":121.56,"beatMedian":0,"marginVsMedian":-24.24,"luck":"Lucky Win","teamsBeaten":2},{"week":7,"manager":"Nicklas","team":"Charlottesville Chargers","oppManager":"Holden","oppTeam":"Pete Wiener","pf":116.48,"pa":94.54,"margin":21.94,"winValue":1,"result":"Win","weekMedian":121.56,"beatMedian":0,"marginVsMedian":-5.08,"luck":"Lucky Win","teamsBeaten":4},{"week":7,"manager":"Dilan","team":"Dilan","oppManager":"Ronald","oppTeam":"Regi nald","pf":152.16,"pa":157.16,"margin":-5,"winValue":0,"result":"Loss","weekMedian":121.56,"beatMedian":1,"marginVsMedian":30.6,"luck":"Unlucky Loss","teamsBeaten":7},{"week":7,"manager":"Will","team":"THE BROCK","oppManager":"Andrew","oppTeam":"Quaheato's Deli","pf":188.58,"pa":107.84,"margin":80.74,"winValue":1,"result":"Win","weekMedian":121.56,"beatMedian":1,"marginVsMedian":67.02,"luck":"Deserved Win","teamsBeaten":9},{"week":7,"manager":"Nasty","team":"Nasty","oppManager":"Spencer","oppTeam":"Richard Scrote Jamal","pf":135.44,"pa":126.64,"margin":8.8,"winValue":1,"result":"Win","weekMedian":121.56,"beatMedian":1,"marginVsMedian":13.88,"luck":"Deserved Win","teamsBeaten":6},{"week":7,"manager":"Ohm","team":"Allagash White Soopremacy","oppManager":"Trevor","oppTeam":"Koo Cooks Klan","pf":92.38,"pa":97.32,"margin":-4.94,"winValue":0,"result":"Loss","weekMedian":121.56,"beatMedian":0,"marginVsMedian":-29.18,"luck":"Deserved Loss","teamsBeaten":0},{"week":7,"manager":"Ronald","team":"Regi nald","oppManager":"Dilan","oppTeam":"Dilan","pf":157.16,"pa":152.16,"margin":5,"winValue":1,"result":"Win","weekMedian":121.56,"beatMedian":1,"marginVsMedian":35.6,"luck":"Deserved Win","teamsBeaten":8},{"week":8,"manager":"Spencer","team":"Richard Scrote Jamal","oppManager":"Dilan","oppTeam":"Dilan","pf":127.56,"pa":132.28,"margin":-4.72,"winValue":0,"result":"Loss","weekMedian":128.83,"beatMedian":0,"marginVsMedian":-1.26999999999998,"luck":"Deserved Loss","teamsBeaten":4},{"week":8,"manager":"Andrew","team":"Quaheato's Deli","oppManager":"Ronald","oppTeam":"Regi nald","pf":131.98,"pa":132.42,"margin":-0.439999999999998,"winValue":0,"result":"Loss","weekMedian":128.83,"beatMedian":1,"marginVsMedian":3.15000000000001,"luck":"Unlucky Loss","teamsBeaten":6},{"week":8,"manager":"Holden","team":"Pete Wiener","oppManager":"Ohm","oppTeam":"Allagash White Soopremacy","pf":97.28,"pa":77.7,"margin":19.58,"winValue":1,"result":"Win","weekMedian":128.83,"beatMedian":0,"marginVsMedian":-31.55,"luck":"Lucky Win","teamsBeaten":1},{"week":8,"manager":"Trevor","team":"Koo Cooks Klan","oppManager":"Nasty","oppTeam":"Nasty","pf":114.78,"pa":123.86,"margin":-9.08,"winValue":0,"result":"Loss","weekMedian":128.83,"beatMedian":0,"marginVsMedian":-14.05,"luck":"Deserved Loss","teamsBeaten":2},{"week":8,"manager":"Nicklas","team":"Charlottesville Chargers","oppManager":"Will","oppTeam":"THE BROCK","pf":147.18,"pa":130.1,"margin":17.08,"winValue":1,"result":"Win","weekMedian":128.83,"beatMedian":1,"marginVsMedian":18.35,"luck":"Deserved Win","teamsBeaten":9},{"week":8,"manager":"Dilan","team":"Dilan","oppManager":"Spencer","oppTeam":"Richard Scrote Jamal","pf":132.28,"pa":127.56,"margin":4.72,"winValue":1,"result":"Win","weekMedian":128.83,"beatMedian":1,"marginVsMedian":3.45000000000002,"luck":"Deserved Win","teamsBeaten":7},{"week":8,"manager":"Will","team":"THE BROCK","oppManager":"Nicklas","oppTeam":"Charlottesville Chargers","pf":130.1,"pa":147.18,"margin":-17.08,"winValue":0,"result":"Loss","weekMedian":128.83,"beatMedian":1,"marginVsMedian":1.27000000000001,"luck":"Unlucky Loss","teamsBeaten":5},{"week":8,"manager":"Nasty","team":"Nasty","oppManager":"Trevor","oppTeam":"Koo Cooks Klan","pf":123.86,"pa":114.78,"margin":9.08,"winValue":1,"result":"Win","weekMedian":128.83,"beatMedian":0,"marginVsMedian":-4.96999999999999,"luck":"Lucky Win","teamsBeaten":3},{"week":8,"manager":"Ohm","team":"Allagash White Soopremacy","oppManager":"Holden","oppTeam":"Pete Wiener","pf":77.7,"pa":97.28,"margin":-19.58,"winValue":0,"result":"Loss","weekMedian":128.83,"beatMedian":0,"marginVsMedian":-51.13,"luck":"Deserved Loss","teamsBeaten":0},{"week":8,"manager":"Ronald","team":"Regi nald","oppManager":"Andrew","oppTeam":"Quaheato's Deli","pf":132.42,"pa":131.98,"margin":0.439999999999998,"winValue":1,"result":"Win","weekMedian":128.83,"beatMedian":1,"marginVsMedian":3.59,"luck":"Deserved Win","teamsBeaten":8},{"week":9,"manager":"Spencer","team":"Richard Scrote Jamal","oppManager":"Trevor","oppTeam":"Koo Cooks Klan","pf":137.04,"pa":137.04,"margin":0,"winValue":0.5,"result":"Tie","weekMedian":123.38,"beatMedian":1,"marginVsMedian":13.66,"luck":"Tie","teamsBeaten":6},{"week":9,"manager":"Andrew","team":"Quaheato's Deli","oppManager":"Dilan","oppTeam":"Dilan","pf":142.86,"pa":106.7,"margin":36.16,"winValue":1,"result":"Win","weekMedian":123.38,"beatMedian":1,"marginVsMedian":19.48,"luck":"Deserved Win","teamsBeaten":8},{"week":9,"manager":"Holden","team":"Pete Wiener","oppManager":"Nasty","oppTeam":"Nasty","pf":106.08,"pa":97.4,"margin":8.67999999999999,"winValue":1,"result":"Win","weekMedian":123.38,"beatMedian":0,"marginVsMedian":-17.3,"luck":"Lucky Win","teamsBeaten":2},{"week":9,"manager":"Trevor","team":"Koo Cooks Klan","oppManager":"Spencer","oppTeam":"Richard Scrote Jamal","pf":137.04,"pa":137.04,"margin":0,"winValue":0.5,"result":"Tie","weekMedian":123.38,"beatMedian":1,"marginVsMedian":13.66,"luck":"Tie","teamsBeaten":6},{"week":9,"manager":"Nicklas","team":"Charlottesville Chargers","oppManager":"Ronald","oppTeam":"Regi nald","pf":188.066,"pa":105.62,"margin":82.446,"winValue":1,"result":"Win","weekMedian":123.38,"beatMedian":1,"marginVsMedian":64.686,"luck":"Deserved Win","teamsBeaten":9},{"week":9,"manager":"Dilan","team":"Dilan","oppManager":"Andrew","oppTeam":"Quaheato's Deli","pf":106.7,"pa":142.86,"margin":-36.16,"winValue":0,"result":"Loss","weekMedian":123.38,"beatMedian":0,"marginVsMedian":-16.68,"luck":"Deserved Loss","teamsBeaten":3},{"week":9,"manager":"Will","team":"THE BROCK","oppManager":"Ohm","oppTeam":"Allagash White Soopremacy","pf":111.86,"pa":134.9,"margin":-23.04,"winValue":0,"result":"Loss","weekMedian":123.38,"beatMedian":0,"marginVsMedian":-11.52,"luck":"Deserved Loss","teamsBeaten":4},{"week":9,"manager":"Nasty","team":"Nasty","oppManager":"Holden","oppTeam":"Pete Wiener","pf":97.4,"pa":106.08,"margin":-8.67999999999999,"winValue":0,"result":"Loss","weekMedian":123.38,"beatMedian":0,"marginVsMedian":-25.98,"luck":"Deserved Loss","teamsBeaten":0},{"week":9,"manager":"Ohm","team":"Allagash White Soopremacy","oppManager":"Will","oppTeam":"THE BROCK","pf":134.9,"pa":111.86,"margin":23.04,"winValue":1,"result":"Win","weekMedian":123.38,"beatMedian":1,"marginVsMedian":11.52,"luck":"Deserved Win","teamsBeaten":5},{"week":9,"manager":"Ronald","team":"Regi nald","oppManager":"Nicklas","oppTeam":"Charlottesville Chargers","pf":105.62,"pa":188.066,"margin":-82.446,"winValue":0,"result":"Loss","weekMedian":123.38,"beatMedian":0,"marginVsMedian":-17.76,"luck":"Deserved Loss","teamsBeaten":1},{"week":10,"manager":"Spencer","team":"Richard Scrote Jamal","oppManager":"Andrew","oppTeam":"Quaheato's Deli","pf":128.22,"pa":122.8,"margin":5.42,"winValue":1,"result":"Win","weekMedian":125.51,"beatMedian":1,"marginVsMedian":2.71000000000001,"luck":"Deserved Win","teamsBeaten":5},{"week":10,"manager":"Andrew","team":"Quaheato's Deli","oppManager":"Spencer","oppTeam":"Richard Scrote Jamal","pf":122.8,"pa":128.22,"margin":-5.42,"winValue":0,"result":"Loss","weekMedian":125.51,"beatMedian":0,"marginVsMedian":-2.70999999999999,"luck":"Deserved Loss","teamsBeaten":4},{"week":10,"manager":"Holden","team":"Pete Wiener","oppManager":"Trevor","oppTeam":"Koo Cooks Klan","pf":110.2,"pa":156.38,"margin":-46.18,"winValue":0,"result":"Loss","weekMedian":125.51,"beatMedian":0,"marginVsMedian":-15.31,"luck":"Deserved Loss","teamsBeaten":2},{"week":10,"manager":"Trevor","team":"Koo Cooks Klan","oppManager":"Holden","oppTeam":"Pete Wiener","pf":156.38,"pa":110.2,"margin":46.18,"winValue":1,"result":"Win","weekMedian":125.51,"beatMedian":1,"marginVsMedian":30.87,"luck":"Deserved Win","teamsBeaten":8},{"week":10,"manager":"Nicklas","team":"Charlottesville Chargers","oppManager":"Dilan","oppTeam":"Dilan","pf":113.9,"pa":130.6,"margin":-16.7,"winValue":0,"result":"Loss","weekMedian":125.51,"beatMedian":0,"marginVsMedian":-11.61,"luck":"Deserved Loss","teamsBeaten":3},{"week":10,"manager":"Dilan","team":"Dilan","oppManager":"Nicklas","oppTeam":"Charlottesville Chargers","pf":130.6,"pa":113.9,"margin":16.7,"winValue":1,"result":"Win","weekMedian":125.51,"beatMedian":1,"marginVsMedian":5.09,"luck":"Deserved Win","teamsBeaten":6},{"week":10,"manager":"Will","team":"THE BROCK","oppManager":"Nasty","oppTeam":"Nasty","pf":167.24,"pa":87.82,"margin":79.42,"winValue":1,"result":"Win","weekMedian":125.51,"beatMedian":1,"marginVsMedian":41.73,"luck":"Deserved Win","teamsBeaten":9},{"week":10,"manager":"Nasty","team":"Nasty","oppManager":"Will","oppTeam":"THE BROCK","pf":87.82,"pa":167.24,"margin":-79.42,"winValue":0,"result":"Loss","weekMedian":125.51,"beatMedian":0,"marginVsMedian":-37.69,"luck":"Deserved Loss","teamsBeaten":0},{"week":10,"manager":"Ohm","team":"Allagash White Soopremacy","oppManager":"Ronald","oppTeam":"Regi nald","pf":95.4,"pa":154.44,"margin":-59.04,"winValue":0,"result":"Loss","weekMedian":125.51,"beatMedian":0,"marginVsMedian":-30.11,"luck":"Deserved Loss","teamsBeaten":1},{"week":10,"manager":"Ronald","team":"Regi nald","oppManager":"Ohm","oppTeam":"Allagash White Soopremacy","pf":154.44,"pa":95.4,"margin":59.04,"winValue":1,"result":"Win","weekMedian":125.51,"beatMedian":1,"marginVsMedian":28.93,"luck":"Deserved Win","teamsBeaten":7},{"week":11,"manager":"Spencer","team":"Richard Scrote Jamal","oppManager":"Holden","oppTeam":"Pete Wiener","pf":95.6,"pa":95.2,"margin":0.399999999999992,"winValue":1,"result":"Win","weekMedian":101.44,"beatMedian":0,"marginVsMedian":-5.84,"luck":"Lucky Win","teamsBeaten":3},{"week":11,"manager":"Andrew","team":"Quaheato's Deli","oppManager":"Nicklas","oppTeam":"Charlottesville Chargers","pf":124.9,"pa":107.04,"margin":17.86,"winValue":1,"result":"Win","weekMedian":101.44,"beatMedian":1,"marginVsMedian":23.46,"luck":"Deserved Win","teamsBeaten":6},{"week":11,"manager":"Holden","team":"Pete Wiener","oppManager":"Spencer","oppTeam":"Richard Scrote Jamal","pf":95.2,"pa":95.6,"margin":-0.399999999999992,"winValue":0,"result":"Loss","weekMedian":101.44,"beatMedian":0,"marginVsMedian":-6.24,"luck":"Deserved Loss","teamsBeaten":2},{"week":11,"manager":"Trevor","team":"Koo Cooks Klan","oppManager":"Will","oppTeam":"THE BROCK","pf":127.92,"pa":88.52,"margin":39.4,"winValue":1,"result":"Win","weekMedian":101.44,"beatMedian":1,"marginVsMedian":26.48,"luck":"Deserved Win","teamsBeaten":7},{"week":11,"manager":"Nicklas","team":"Charlottesville Chargers","oppManager":"Andrew","oppTeam":"Quaheato's Deli","pf":107.04,"pa":124.9,"margin":-17.86,"winValue":0,"result":"Loss","weekMedian":101.44,"beatMedian":1,"marginVsMedian":5.60000000000001,"luck":"Unlucky Loss","teamsBeaten":5},{"week":11,"manager":"Dilan","team":"Dilan","oppManager":"Ohm","oppTeam":"Allagash White Soopremacy","pf":131.24,"pa":86.42,"margin":44.82,"winValue":1,"result":"Win","weekMedian":101.44,"beatMedian":1,"marginVsMedian":29.8,"luck":"Deserved Win","teamsBeaten":8},{"week":11,"manager":"Will","team":"THE BROCK","oppManager":"Trevor","oppTeam":"Koo Cooks Klan","pf":88.52,"pa":127.92,"margin":-39.4,"winValue":0,"result":"Loss","weekMedian":101.44,"beatMedian":0,"marginVsMedian":-12.92,"luck":"Deserved Loss","teamsBeaten":1},{"week":11,"manager":"Nasty","team":"Nasty","oppManager":"Ronald","oppTeam":"Regi nald","pf":95.84,"pa":136.08,"margin":-40.24,"winValue":0,"result":"Loss","weekMedian":101.44,"beatMedian":0,"marginVsMedian":-5.59999999999999,"luck":"Deserved Loss","teamsBeaten":4},{"week":11,"manager":"Ohm","team":"Allagash White Soopremacy","oppManager":"Dilan","oppTeam":"Dilan","pf":86.42,"pa":131.24,"margin":-44.82,"winValue":0,"result":"Loss","weekMedian":101.44,"beatMedian":0,"marginVsMedian":-15.02,"luck":"Deserved Loss","teamsBeaten":0},{"week":11,"manager":"Ronald","team":"Regi nald","oppManager":"Nasty","oppTeam":"Nasty","pf":136.08,"pa":95.84,"margin":40.24,"winValue":1,"result":"Win","weekMedian":101.44,"beatMedian":1,"marginVsMedian":34.64,"luck":"Deserved Win","teamsBeaten":9},{"week":12,"manager":"Spencer","team":"Richard Scrote Jamal","oppManager":"Nicklas","oppTeam":"Charlottesville Chargers","pf":123.26,"pa":100.76,"margin":22.5,"winValue":1,"result":"Win","weekMedian":122.77,"beatMedian":1,"marginVsMedian":0.489999999999995,"luck":"Deserved Win","teamsBeaten":5},{"week":12,"manager":"Andrew","team":"Quaheato's Deli","oppManager":"Ohm","oppTeam":"Allagash White Soopremacy","pf":105.36,"pa":146.26,"margin":-40.9,"winValue":0,"result":"Loss","weekMedian":122.77,"beatMedian":0,"marginVsMedian":-17.41,"luck":"Deserved Loss","teamsBeaten":2},{"week":12,"manager":"Holden","team":"Pete Wiener","oppManager":"Will","oppTeam":"THE BROCK","pf":119.64,"pa":131.62,"margin":-11.98,"winValue":0,"result":"Loss","weekMedian":122.77,"beatMedian":0,"marginVsMedian":-3.13000000000001,"luck":"Deserved Loss","teamsBeaten":3},{"week":12,"manager":"Trevor","team":"Koo Cooks Klan","oppManager":"Ronald","oppTeam":"Regi nald","pf":122.28,"pa":161.22,"margin":-38.94,"winValue":0,"result":"Loss","weekMedian":122.77,"beatMedian":0,"marginVsMedian":-0.490000000000009,"luck":"Deserved Loss","teamsBeaten":4},{"week":12,"manager":"Nicklas","team":"Charlottesville Chargers","oppManager":"Spencer","oppTeam":"Richard Scrote Jamal","pf":100.76,"pa":123.26,"margin":-22.5,"winValue":0,"result":"Loss","weekMedian":122.77,"beatMedian":0,"marginVsMedian":-22.01,"luck":"Deserved Loss","teamsBeaten":1},{"week":12,"manager":"Dilan","team":"Dilan","oppManager":"Nasty","oppTeam":"Nasty","pf":95.22,"pa":124.68,"margin":-29.46,"winValue":0,"result":"Loss","weekMedian":122.77,"beatMedian":0,"marginVsMedian":-27.55,"luck":"Deserved Loss","teamsBeaten":0},{"week":12,"manager":"Will","team":"THE BROCK","oppManager":"Holden","oppTeam":"Pete Wiener","pf":131.62,"pa":119.64,"margin":11.98,"winValue":1,"result":"Win","weekMedian":122.77,"beatMedian":1,"marginVsMedian":8.84999999999999,"luck":"Deserved Win","teamsBeaten":7},{"week":12,"manager":"Nasty","team":"Nasty","oppManager":"Dilan","oppTeam":"Dilan","pf":124.68,"pa":95.22,"margin":29.46,"winValue":1,"result":"Win","weekMedian":122.77,"beatMedian":1,"marginVsMedian":1.91,"luck":"Deserved Win","teamsBeaten":6},{"week":12,"manager":"Ohm","team":"Allagash White Soopremacy","oppManager":"Andrew","oppTeam":"Quaheato's Deli","pf":146.26,"pa":105.36,"margin":40.9,"winValue":1,"result":"Win","weekMedian":122.77,"beatMedian":1,"marginVsMedian":23.49,"luck":"Deserved Win","teamsBeaten":8},{"week":12,"manager":"Ronald","team":"Regi nald","oppManager":"Trevor","oppTeam":"Koo Cooks Klan","pf":161.22,"pa":122.28,"margin":38.94,"winValue":1,"result":"Win","weekMedian":122.77,"beatMedian":1,"marginVsMedian":38.45,"luck":"Deserved Win","teamsBeaten":9},{"week":13,"manager":"Spencer","team":"Richard Scrote Jamal","oppManager":"Will","oppTeam":"THE BROCK","pf":157.5,"pa":102.94,"margin":54.56,"winValue":1,"result":"Win","weekMedian":106.21,"beatMedian":1,"marginVsMedian":51.29,"luck":"Deserved Win","teamsBeaten":8},{"week":13,"manager":"Andrew","team":"Quaheato's Deli","oppManager":"Nasty","oppTeam":"Nasty","pf":157.74,"pa":85.54,"margin":72.2,"winValue":1,"result":"Win","weekMedian":106.21,"beatMedian":1,"marginVsMedian":51.53,"luck":"Deserved Win","teamsBeaten":9},{"week":13,"manager":"Holden","team":"Pete Wiener","oppManager":"Ronald","oppTeam":"Regi nald","pf":78.04,"pa":126.52,"margin":-48.48,"winValue":0,"result":"Loss","weekMedian":106.21,"beatMedian":0,"marginVsMedian":-28.17,"luck":"Deserved Loss","teamsBeaten":0},{"week":13,"manager":"Trevor","team":"Koo Cooks Klan","oppManager":"Dilan","oppTeam":"Dilan","pf":94.96,"pa":131.04,"margin":-36.08,"winValue":0,"result":"Loss","weekMedian":106.21,"beatMedian":0,"marginVsMedian":-11.25,"luck":"Deserved Loss","teamsBeaten":3},{"week":13,"manager":"Nicklas","team":"Charlottesville Chargers","oppManager":"Ohm","oppTeam":"Allagash White Soopremacy","pf":109.48,"pa":92.36,"margin":17.12,"winValue":1,"result":"Win","weekMedian":106.21,"beatMedian":1,"marginVsMedian":3.27,"luck":"Deserved Win","teamsBeaten":5},{"week":13,"manager":"Dilan","team":"Dilan","oppManager":"Trevor","oppTeam":"Koo Cooks Klan","pf":131.04,"pa":94.96,"margin":36.08,"winValue":1,"result":"Win","weekMedian":106.21,"beatMedian":1,"marginVsMedian":24.83,"luck":"Deserved Win","teamsBeaten":7},{"week":13,"manager":"Will","team":"THE BROCK","oppManager":"Spencer","oppTeam":"Richard Scrote Jamal","pf":102.94,"pa":157.5,"margin":-54.56,"winValue":0,"result":"Loss","weekMedian":106.21,"beatMedian":0,"marginVsMedian":-3.27000000000001,"luck":"Deserved Loss","teamsBeaten":4},{"week":13,"manager":"Nasty","team":"Nasty","oppManager":"Andrew","oppTeam":"Quaheato's Deli","pf":85.54,"pa":157.74,"margin":-72.2,"winValue":0,"result":"Loss","weekMedian":106.21,"beatMedian":0,"marginVsMedian":-20.67,"luck":"Deserved Loss","teamsBeaten":1},{"week":13,"manager":"Ohm","team":"Allagash White Soopremacy","oppManager":"Nicklas","oppTeam":"Charlottesville Chargers","pf":92.36,"pa":109.48,"margin":-17.12,"winValue":0,"result":"Loss","weekMedian":106.21,"beatMedian":0,"marginVsMedian":-13.85,"luck":"Deserved Loss","teamsBeaten":2},{"week":13,"manager":"Ronald","team":"Regi nald","oppManager":"Holden","oppTeam":"Pete Wiener","pf":126.52,"pa":78.04,"margin":48.48,"winValue":1,"result":"Win","weekMedian":106.21,"beatMedian":1,"marginVsMedian":20.31,"luck":"Deserved Win","teamsBeaten":6}],"weekStats":[{"week":1,"games":10,"average":119.72,"median":111.59,"high":172.26,"highScorer":"Regi nald","low":87.82,"lowScorer":"Nasty","stdDev":23.95},{"week":2,"games":10,"average":117.31,"median":111.86,"high":144.3,"highScorer":"Charlottesville Chargers","low":94.5,"lowScorer":"Allagash White Soopremacy","stdDev":18.28},{"week":3,"games":10,"average":120.66,"median":118.29,"high":156.82,"highScorer":"THE BROCK","low":94.22,"lowScorer":"Pete Wiener","stdDev":22.38},{"week":4,"games":10,"average":126.04,"median":126.17,"high":150.8,"highScorer":"Nasty","low":102.12,"lowScorer":"Quaheato's Deli","stdDev":17.13},{"week":5,"games":10,"average":122.74,"median":119.47,"high":148.62,"highScorer":"Regi nald","low":99.94,"lowScorer":"Dilan","stdDev":18.02},{"week":6,"games":10,"average":122.14,"median":120.93,"high":154.04,"highScorer":"THE BROCK","low":93.6,"lowScorer":"Regi nald","stdDev":22.52},{"week":7,"games":10,"average":126.85,"median":121.56,"high":188.58,"highScorer":"THE BROCK","low":92.38,"lowScorer":"Allagash White Soopremacy","stdDev":31.65},{"week":8,"games":10,"average":121.51,"median":128.83,"high":147.18,"highScorer":"Charlottesville Chargers","low":77.7,"lowScorer":"Allagash White Soopremacy","stdDev":20.2},{"week":9,"games":10,"average":126.76,"median":123.38,"high":188.066,"highScorer":"Charlottesville Chargers","low":97.4,"lowScorer":"Nasty","stdDev":27.2},{"week":10,"games":10,"average":126.7,"median":125.51,"high":167.24,"highScorer":"THE BROCK","low":87.82,"lowScorer":"Nasty","stdDev":26.36},{"week":11,"games":10,"average":108.88,"median":101.44,"high":136.08,"highScorer":"Regi nald","low":86.42,"lowScorer":"Allagash White Soopremacy","stdDev":19.19},{"week":12,"games":10,"average":123.03,"median":122.77,"high":161.22,"highScorer":"Regi nald","low":95.22,"lowScorer":"Dilan","stdDev":20.19},{"week":13,"games":10,"average":113.61,"median":106.21,"high":157.74,"highScorer":"Quaheato's Deli","low":78.04,"lowScorer":"Pete Wiener","stdDev":28.53}]}},"currentSeason":"2026.27"};
+
+</script>
+<script>
+(function () {
+  "use strict";
+
+  var DATA = window.LEAGUE_DATA;
+  var seasonKeys = Object.keys(DATA.seasons).sort().reverse(); // newest first
+  var state = {
+    season: DATA.currentSeason || seasonKeys[0],
+    manager: null,
+    week: null,
+    standingsSort: { key: "actualRank", dir: "asc" },
+  };
+
+  // columns where a bigger number is "better" and should sort high-to-low by default
+  var DESC_BY_DEFAULT = {
+    actualWinPct: true, medianWinPct: true, luckRating: true,
+    allPlayWinPct: true, pointsFor: true, pointsAgainst: true,
+  };
+
+  var tooltipEl = document.getElementById("tooltip");
+
+  // ---------------- helpers ----------------
+  function fmt1(n) { return (Math.round(n * 10) / 10).toFixed(1); }
+  function fmt2(n) { return (Math.round(n * 100) / 100).toFixed(2); }
+  function pct(n) { return Math.round(n * 1000) / 10 + "%"; }
+  function signed(n) {
+    if (n > 0) return "+" + n;
+    return String(n);
+  }
+  function record(w, l, t) {
+    return t ? (w + "-" + l + "-" + t) : (w + "-" + l);
+  }
+  function el(tag, attrs, children) {
+    var e = document.createElement(tag);
+    if (attrs) Object.keys(attrs).forEach(function (k) {
+      if (k === "class") e.className = attrs[k];
+      else if (k === "html") e.innerHTML = attrs[k];
+      else e.setAttribute(k, attrs[k]);
+    });
+    (children || []).forEach(function (c) {
+      if (typeof c === "string") e.appendChild(document.createTextNode(c));
+      else if (c) e.appendChild(c);
+    });
+    return e;
+  }
+  function svg(tag, attrs) {
+    var e = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    if (attrs) Object.keys(attrs).forEach(function (k) { e.setAttribute(k, attrs[k]); });
+    return e;
+  }
+
+  var LUCK_META = {
+    "Deserved Win":  { cls: "good",     label: "Deserved Win"  },
+    "Lucky Win":     { cls: "warning",  label: "Lucky Win"     },
+    "Unlucky Loss":  { cls: "serious",  label: "Unlucky Loss"  },
+    "Deserved Loss": { cls: "critical", label: "Deserved Loss" },
+    "Tie":           { cls: "neutral",  label: "Tie"           },
+  };
+  function luckChip(label) {
+    var meta = LUCK_META[label] || { cls: "neutral", label: label || "—" };
+    var chip = el("span", { class: "chip " + meta.cls });
+    chip.appendChild(el("span", { class: "dot" }));
+    chip.appendChild(document.createTextNode(meta.label));
+    return chip;
+  }
+
+  function currentData() { return DATA.seasons[state.season]; }
+
+  function showTooltip(x, y, html) {
+    tooltipEl.innerHTML = html;
+    tooltipEl.style.left = x + "px";
+    tooltipEl.style.top = y + "px";
+    tooltipEl.classList.add("show");
+  }
+  function hideTooltip() { tooltipEl.classList.remove("show"); }
+
+  // ---------------- header / season toggle / tabs ----------------
+  function buildSeasonToggle() {
+    var wrap = document.getElementById("season-toggle");
+    wrap.innerHTML = "";
+    seasonKeys.forEach(function (key) {
+      var btn = el("button", {}, [key]);
+      if (key === state.season) btn.classList.add("active");
+      btn.addEventListener("click", function () {
+        state.season = key;
+        state.manager = null;
+        state.week = null;
+        buildSeasonToggle();
+        renderAll();
+      });
+      wrap.appendChild(btn);
+    });
+  }
+
+  function buildTabs() {
+    var buttons = document.querySelectorAll("#tabs button");
+    buttons.forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        buttons.forEach(function (b) { b.classList.remove("active"); });
+        btn.classList.add("active");
+        document.querySelectorAll(".panel").forEach(function (p) { p.classList.remove("active"); });
+        document.getElementById("panel-" + btn.dataset.tab).classList.add("active");
+      });
+    });
+  }
+
+  // ---------------- Standings ----------------
+  function buildStandingsControls() {
+    var headers = document.querySelectorAll("#standings-table thead th[data-key]");
+    headers.forEach(function (th) {
+      th.addEventListener("click", function () {
+        var key = th.dataset.key;
+        if (state.standingsSort.key === key) {
+          state.standingsSort.dir = state.standingsSort.dir === "asc" ? "desc" : "asc";
+        } else {
+          state.standingsSort.key = key;
+          state.standingsSort.dir = DESC_BY_DEFAULT[key] ? "desc" : "asc";
+        }
+        renderStandings();
+      });
+    });
+  }
+
+  function updateSortIndicators() {
+    var headers = document.querySelectorAll("#standings-table thead th[data-key]");
+    headers.forEach(function (th) {
+      var arrow = th.querySelector(".arrow");
+      if (th.dataset.key === state.standingsSort.key) {
+        th.classList.add("sorted");
+        if (arrow) arrow.textContent = state.standingsSort.dir === "asc" ? "▲" : "▼";
+      } else {
+        th.classList.remove("sorted");
+        if (arrow) arrow.textContent = "";
+      }
+    });
+  }
+
+  function renderStandings() {
+    var d = currentData();
+    var rows = d.standings.slice();
+
+    var key = state.standingsSort.key, dir = state.standingsSort.dir;
+    rows.sort(function (a, b) {
+      var av = a[key], bv = b[key];
+      var cmp = (typeof av === "string") ? av.localeCompare(bv) : (av - bv);
+      return dir === "asc" ? cmp : -cmp;
+    });
+    updateSortIndicators();
+
+    document.getElementById("header-subtitle").textContent =
+      d.season + " — " + d.weeksLogged + " week" + (d.weeksLogged === 1 ? "" : "s") + " logged";
+
+    var tbody = document.querySelector("#standings-table tbody");
+    tbody.innerHTML = "";
+    rows.forEach(function (r) {
+      var tr = el("tr");
+      tr.appendChild(el("td", { class: "rank" }, [String(r.actualRank)]));
+      var teamCell = el("td", { class: "team-cell" });
+      teamCell.appendChild(el("span", { class: "team-name" }, [r.team]));
+      teamCell.appendChild(el("span", { class: "manager-name" }, [r.manager]));
+      tr.appendChild(teamCell);
+      tr.appendChild(el("td", {}, [record(r.wins, r.losses, r.ties)]));
+      tr.appendChild(el("td", {}, [record(r.medianWins, r.games - r.medianWins, 0)]));
+      var luckCls = r.luckRating > 0 ? "pos" : (r.luckRating < 0 ? "neg" : "zero");
+      tr.appendChild(el("td", {}, [el("span", { class: "num " + luckCls }, [signed(r.luckRating)])]));
+      tr.appendChild(el("td", {}, [r.allPlayWins + " wins (" + pct(r.allPlayWinPct) + ")"]));
+      tr.appendChild(el("td", {}, [fmt2(r.pointsFor)]));
+      tr.appendChild(el("td", {}, [fmt2(r.pointsAgainst)]));
+      tbody.appendChild(tr);
+    });
+
+    renderLuckChart(rows);
+  }
+
+  function renderLuckChart(rows) {
+    var host = document.getElementById("luck-chart");
+    host.innerHTML = "";
+    var sorted = rows.slice().sort(function (a, b) { return b.luckRating - a.luckRating; });
+
+    var W = 640, rowH = 30, padTop = 10, padBottom = 10, labelW = 170, padRight = 40, valueGutter = 34;
+    var H = sorted.length * rowH + padTop + padBottom;
+    var maxAbs = Math.max(1, Math.max.apply(null, sorted.map(function (r) { return Math.abs(r.luckRating); })));
+    var chartW = W - labelW - padRight;
+    var mid = labelW + chartW / 2;
+    var halfW = chartW / 2 - valueGutter; // reserve room for the value label at the far end
+    var scale = halfW / maxAbs;
+
+    var s = svg("svg", { viewBox: "0 0 " + W + " " + H, role: "img", "aria-label": "Net Mickey by team" });
+    s.appendChild(svg("line", { class: "baseline", x1: mid, x2: mid, y1: padTop, y2: H - padBottom }));
+
+    sorted.forEach(function (r, i) {
+      var y = padTop + i * rowH;
+      var barW = Math.abs(r.luckRating) * scale;
+      var x = r.luckRating >= 0 ? mid : mid - barW;
+      var color = r.luckRating > 0 ? "var(--diverge-pos)" : (r.luckRating < 0 ? "var(--diverge-neg)" : "var(--baseline)");
+
+      var label = svg("text", { x: labelW - 10, y: y + rowH / 2 + 4, "text-anchor": "end", class: "tick-label", "font-weight": "600" });
+      label.textContent = r.team.length > 20 ? r.team.slice(0, 19) + "…" : r.team;
+      s.appendChild(label);
+
+      var rect = svg("rect", {
+        x: Math.max(x, mid - chartW / 2), y: y + 5, width: Math.max(barW, 1), height: rowH - 12,
+        rx: 4, fill: color,
+      });
+      s.appendChild(rect);
+
+      var valText = svg("text", {
+        x: r.luckRating >= 0 ? mid + barW + 6 : mid - barW - 6,
+        y: y + rowH / 2 + 4,
+        "text-anchor": r.luckRating >= 0 ? "start" : "end",
+        class: "bar-label",
+      });
+      valText.textContent = signed(r.luckRating);
+      s.appendChild(valText);
+    });
+
+    host.appendChild(s);
+  }
+
+  // ---------------- Team Detail ----------------
+  function buildTeamSelect() {
+    var d = currentData();
+    var sel = document.getElementById("team-select");
+    sel.innerHTML = "";
+    var sorted = d.standings.slice().sort(function (a, b) { return a.actualRank - b.actualRank; });
+    sorted.forEach(function (r) {
+      var opt = el("option", { value: r.manager }, [r.team + " (" + r.manager + ")"]);
+      sel.appendChild(opt);
+    });
+    if (!state.manager || !d.standings.some(function (r) { return r.manager === state.manager; })) {
+      var mine = d.standings.some(function (r) { return r.manager === "Spencer"; });
+      state.manager = mine ? "Spencer" : sorted[0].manager;
+    }
+    sel.value = state.manager;
+    sel.onchange = function () { state.manager = sel.value; renderTeamDetail(); };
+  }
+
+  function renderTeamDetail() {
+    var d = currentData();
+    var teamRows = d.log.filter(function (r) { return r.manager === state.manager; })
+      .sort(function (a, b) { return a.week - b.week; });
+    var standing = d.standings.filter(function (r) { return r.manager === state.manager; })[0];
+
+    var statsHost = document.getElementById("team-stats");
+    statsHost.innerHTML = "";
+    var tiles = [
+      { label: "Record", value: record(standing.wins, standing.losses, standing.ties) },
+      { label: "Median Record", value: record(standing.medianWins, standing.games - standing.medianWins, 0) },
+      { label: "Net Mickey", value: signed(standing.luckRating), cls: standing.luckRating > 0 ? "pos" : (standing.luckRating < 0 ? "neg" : "") },
+      { label: "All-Play Win %", value: pct(standing.allPlayWinPct) },
+    ];
+    tiles.forEach(function (t) {
+      var tile = el("div", { class: "stat-tile" });
+      tile.appendChild(el("div", { class: "label" }, [t.label]));
+      tile.appendChild(el("div", { class: "value " + (t.cls || "") }, [t.value]));
+      statsHost.appendChild(tile);
+    });
+
+    var tbody = document.querySelector("#team-table tbody");
+    tbody.innerHTML = "";
+    teamRows.forEach(function (r) {
+      var tr = el("tr");
+      tr.appendChild(el("td", {}, [String(r.week)]));
+      tr.appendChild(el("td", {}, [r.oppTeam]));
+      tr.appendChild(el("td", {}, [fmt2(r.pf)]));
+      tr.appendChild(el("td", {}, [fmt2(r.pa)]));
+      tr.appendChild(el("td", {}, [fmt2(r.weekMedian)]));
+      tr.appendChild(el("td", {}, [luckChip(r.luck)]));
+      tbody.appendChild(tr);
+    });
+
+    renderTeamChart(teamRows);
+  }
+
+  function renderTeamChart(rows) {
+    var host = document.getElementById("team-chart");
+    host.innerHTML = "";
+    if (!rows.length) { host.appendChild(el("p", { class: "panel-intro" }, ["No games logged yet."])); return; }
+
+    var W = 640, H = 260, padL = 40, padR = 16, padT = 16, padB = 28;
+    var plotW = W - padL - padR, plotH = H - padT - padB;
+
+    var allVals = [];
+    rows.forEach(function (r) { allVals.push(r.pf, r.weekMedian); });
+    var minV = Math.min.apply(null, allVals), maxV = Math.max.apply(null, allVals);
+    var pad = (maxV - minV) * 0.15 || 10;
+    minV -= pad; maxV += pad;
+
+    function xOf(i) { return rows.length > 1 ? padL + (i / (rows.length - 1)) * plotW : padL + plotW / 2; }
+    function yOf(v) { return padT + plotH - ((v - minV) / (maxV - minV)) * plotH; }
+
+    var s = svg("svg", { viewBox: "0 0 " + W + " " + H, role: "img", "aria-label": "Score versus median by week" });
+
+    // gridlines (4)
+    for (var g = 0; g <= 3; g++) {
+      var gv = minV + (g / 3) * (maxV - minV);
+      var gy = yOf(gv);
+      s.appendChild(svg("line", { class: "gridline", x1: padL, x2: W - padR, y1: gy, y2: gy }));
+      var gt = svg("text", { x: padL - 8, y: gy + 3, "text-anchor": "end", class: "tick-label" });
+      gt.textContent = Math.round(gv);
+      s.appendChild(gt);
+    }
+    // x labels (week numbers)
+    rows.forEach(function (r, i) {
+      if (rows.length > 14 && i % 2 === 1) return;
+      var t = svg("text", { x: xOf(i), y: H - 8, "text-anchor": "middle", class: "tick-label" });
+      t.textContent = "W" + r.week;
+      s.appendChild(t);
+    });
+
+    function pathFor(key) {
+      return rows.map(function (r, i) { return (i === 0 ? "M" : "L") + xOf(i) + "," + yOf(r[key]); }).join(" ");
+    }
+
+    s.appendChild(svg("path", { d: pathFor("weekMedian"), fill: "none", stroke: "var(--text-muted)", "stroke-width": 2, "stroke-dasharray": "5,4", opacity: 0.7 }));
+    s.appendChild(svg("path", { d: pathFor("pf"), fill: "none", stroke: "var(--series-1)", "stroke-width": 2.5 }));
+
+    if (rows.length === 1) {
+      s.appendChild(svg("circle", { cx: xOf(0), cy: yOf(rows[0].weekMedian), r: 4, fill: "var(--surface)", stroke: "var(--text-muted)", "stroke-width": 2 }));
+    }
+
+    rows.forEach(function (r, i) {
+      var cx = xOf(i), cy = yOf(r.pf);
+      var dot = svg("circle", { class: "hover-dot", cx: cx, cy: cy, r: 4, stroke: "var(--series-1)" });
+      s.appendChild(dot);
+      var hit = svg("circle", { cx: cx, cy: cy, r: 10, fill: "transparent", style: "cursor:pointer" });
+      hit.addEventListener("mousemove", function (evt) {
+        var rect = s.getBoundingClientRect();
+        var scaleX = rect.width / W;
+        showTooltip(rect.left + window.scrollX + cx * scaleX, rect.top + window.scrollY + cy * scaleX,
+          "<strong>Week " + r.week + "</strong> vs " + r.oppTeam + "<br>" +
+          fmt2(r.pf) + " pts (median " + fmt2(r.weekMedian) + ")<br>" + (LUCK_META[r.luck] || {}).label);
+      });
+      hit.addEventListener("mouseleave", hideTooltip);
+      s.appendChild(hit);
+    });
+
+    host.appendChild(s);
+  }
+
+  // ---------------- Weekly Recap ----------------
+  function buildWeekPicker() {
+    var d = currentData();
+    if (!state.week || state.week > d.weeksLogged) state.week = d.weeksLogged;
+    var picker = document.getElementById("week-picker");
+    picker.innerHTML = "";
+    for (var w = 1; w <= d.weeksLogged; w++) {
+      (function (w) {
+        var btn = el("button", {}, ["Week " + w]);
+        if (w === state.week) btn.classList.add("active");
+        btn.addEventListener("click", function () {
+          state.week = w;
+          buildWeekPicker();
+          renderWeekly();
+        });
+        picker.appendChild(btn);
+      })(w);
+    }
+  }
+
+  function renderWeekly() {
+    var d = currentData();
+    var weekRows = d.log.filter(function (r) { return r.week === state.week; });
+    var weekStat = d.weekStats.filter(function (r) { return r.week === state.week; })[0];
+    var grid = document.getElementById("matchup-grid");
+    grid.innerHTML = "";
+
+    var seen = {};
+    weekRows.forEach(function (r) {
+      var key = [r.manager, r.oppManager].sort().join("|");
+      if (seen[key]) return;
+      seen[key] = true;
+      var opp = weekRows.filter(function (x) { return x.manager === r.oppManager; })[0];
+
+      var box = el("div", { class: "matchup" });
+      [r, opp].forEach(function (side) {
+        var other = side === r ? opp : r;
+        var row = el("div", { class: "side" });
+        var nameCls = side.pf > other.pf ? "name winner" : "name loser";
+        row.appendChild(el("span", { class: nameCls }, [side.team]));
+        var right = el("span", {});
+        right.appendChild(el("span", { class: "score" }, [fmt2(side.pf)]));
+        row.appendChild(right);
+        box.appendChild(row);
+        box.appendChild(luckChip(side.luck));
+      });
+      var medLine = el("div", { class: "median-line" });
+      medLine.appendChild(document.createTextNode("League median this week: " + (weekStat ? fmt2(weekStat.median) : "—")));
+      box.appendChild(medLine);
+      grid.appendChild(box);
+    });
+  }
+
+  // ---------------- wire it up ----------------
+  function renderAll() {
+    buildSeasonToggle();
+    renderStandings();
+    buildTeamSelect();
+    renderTeamDetail();
+    buildWeekPicker();
+    renderWeekly();
+  }
+
+  buildTabs();
+  buildStandingsControls();
+  renderAll();
+})();
+
+</script>
 </body>
 </html>
